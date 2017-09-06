@@ -387,7 +387,7 @@ contains
              write(iulog,*)'clm model is stopping'
              call endrun(decomp_index=indexc, clmlevel=namec, msg=errmsg(__FILE__, __LINE__))
 
-          else if (abs(errh2o(indexc)) > 1.e-4_r8 .and. (nstep > 2) .and. (.not.pf_hmode)) then
+          else if (abs(errh2o(indexc)) > 1.e-4_r8 .and. (nstep > 2)) then
 
              write(iulog,*)'clm model is stopping - error is greater than 1e-4 (mm)'
              write(iulog,*)'nstep                      = ',nstep
@@ -410,6 +410,8 @@ contains
              write(iulog,*)'qflx_lateral               = ',qflx_lateral(indexc)
              write(iulog,*)'total_plant_stored_h2o_col = ',total_plant_stored_h2o_col(indexc)
              write(iulog,*)'clm model is stopping'
+
+             if (.not.pf_hmode .or. abs(errh2o(indexc)) > 1.e-1_r8) &
              call endrun(decomp_index=indexc, clmlevel=namec, msg=errmsg(__FILE__, __LINE__))
           end if
        end if
