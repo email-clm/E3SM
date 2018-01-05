@@ -34,6 +34,7 @@ contains
   subroutine HydrologyDrainage(bounds,    &
        num_nolakec, filter_nolakec,       &
        num_hydrologyc, filter_hydrologyc, &
+       num_hydrononsoic, filter_hydrononsoic, &
        num_urbanc, filter_urbanc,         &
        num_do_smb_c, filter_do_smb_c,     &
        atm2lnd_vars, glc2lnd_vars, temperature_vars,    &
@@ -52,6 +53,7 @@ contains
     use SoilHydrologyMod , only : CLMVICMap, Drainage
     use clm_varctl       , only : use_vsfm
     use BeTRSimulationALM, only : betr_simulation_alm_type
+    use clm_varctl       , only : use_pflotran, pf_hmode
     !
     ! !ARGUMENTS:
     type(bounds_type)        , intent(in)    :: bounds               
@@ -59,6 +61,8 @@ contains
     integer                  , intent(in)    :: filter_nolakec(:)    ! column filter for non-lake points
     integer                  , intent(in)    :: num_hydrologyc       ! number of column soil points in column filter
     integer                  , intent(in)    :: filter_hydrologyc(:) ! column filter for soil points
+    integer                  , intent(in)    :: num_hydrononsoic        ! number of non-soil landunit points in hydrology filter
+    integer                  , intent(in)    :: filter_hydrononsoic(:)  ! column filter for non-soil hydrology points
     integer                  , intent(in)    :: num_urbanc           ! number of column urban points in column filter
     integer                  , intent(in)    :: filter_urbanc(:)     ! column filter for urban points
     integer                  , intent(in)    :: num_do_smb_c         ! number of bareland columns in which SMB is calculated, in column filter    
@@ -132,10 +136,23 @@ contains
       endif
 
       if (.not. use_vsfm) then
+        !------------------------------------------------------------------------------------
+        if (use_pflotran .and. pf_hmode) then
+         ! only call original 'Drainage' module for non-soil-hydrology column
+         call Drainage(bounds, num_hydrononsoic, filter_hydrononsoic, &
+              num_urbanc, filter_urbanc,&
+              temperature_vars, soilhydrology_vars, soilstate_vars, &
+              waterstate_vars, waterflux_vars)
+
+        else
+        !------------------------------------------------------------------------------------
          call Drainage(bounds, num_hydrologyc, filter_hydrologyc, &
               num_urbanc, filter_urbanc,&
               temperature_vars, soilhydrology_vars, soilstate_vars, &
               waterstate_vars, waterflux_vars)
+        !------------------------------------------------------------------------------------
+        endif
+        !------------------------------------------------------------------------------------
       endif
 
       if (use_betr) then

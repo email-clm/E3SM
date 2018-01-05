@@ -135,7 +135,7 @@ contains
            bounds, num_soilc, filter_soilc,                       &
            num_soilp, filter_soilp,                               &
            atm2lnd_vars, soilstate_vars,                          &
-           waterstate_vars, waterflux_vars,                       &
+           waterstate_vars, waterflux_vars, soilhydrology_vars,   &
            temperature_vars, energyflux_vars,                     &
            cnstate_vars, carbonflux_vars, carbonstate_vars,       &
            nitrogenflux_vars, nitrogenstate_vars,                 &
@@ -156,6 +156,7 @@ contains
 
     type(waterstate_type)       , intent(in)    :: waterstate_vars
     type(waterflux_type)        , intent(in)    :: waterflux_vars
+    type(soilhydrology_type)    , intent(in)    :: soilhydrology_vars
     type(temperature_type)      , intent(in)    :: temperature_vars
     type(energyflux_type)       , intent(in)    :: energyflux_vars
 
@@ -190,7 +191,8 @@ contains
     call get_clm_soil_th_state(clm_idata_th,                &
                    bounds, num_soilc, filter_soilc,         &
                    atm2lnd_vars, soilstate_vars,            &
-                   waterstate_vars, temperature_vars)
+                   waterstate_vars, temperature_vars,       &
+                   soilhydrology_vars)
 
     call get_clm_soil_th_flux(clm_idata_th,                 &
                        bounds, num_soilc, filter_soilc,     &
@@ -345,7 +347,8 @@ contains
   subroutine get_clm_soil_th_state(clm_idata_th,            &
                        bounds, num_soilc, filter_soilc,     &
                        atm2lnd_vars, soilstate_vars,        &
-                       waterstate_vars, temperature_vars)
+                       waterstate_vars, temperature_vars,   &
+                       soilhydrology_vars)
   !
   ! !DESCRIPTION:
   !  get soil temperature/saturation from CLM to soil BGC module
@@ -365,6 +368,7 @@ contains
     type(soilstate_type)     , intent(in) :: soilstate_vars
     type(waterstate_type)    , intent(in) :: waterstate_vars
     type(temperature_type)   , intent(in) :: temperature_vars
+    type(soilhydrology_type) , intent(in) :: soilhydrology_vars
 
     type(clm_interface_th_datatype)       , intent(inout) :: clm_idata_th
 
@@ -381,7 +385,10 @@ contains
       h2osoi_vol            => waterstate_vars%h2osoi_vol_col           , & ! [real(r8) (:,:)] volumetric soil water (0<=h2osoi_vol<=watsat) [m3/m3]  (nlevgrnd)
       h2osoi_liq            => waterstate_vars%h2osoi_liq_col           , & ! [real(r8) (:,:)] liquid water (kg/m2) (-nlevsno+1:nlevgrnd)
       h2osoi_ice            => waterstate_vars%h2osoi_ice_col           , & ! [real(r8) (:,:)] ice lens (kg/m2) (-nlevsno+1:nlevgrnd)
-      h2osfc                => waterstate_vars%h2osfc_col               , & ! [real(r8) (:)] surface water (mmH2O)
+      h2osfc                => waterstate_vars%h2osfc_col               , & ! [real(r8) (:)]  surface water (mmH2O)
+      zwt                   => soilhydrology_vars%zwt_col               , & ! [real(r8) (:)]  water table depth (m)
+      zwt_perched           => soilhydrology_vars%zwt_perched_col       , & ! [real(r8) (:)]  perched water table depth (m)
+      frost_table           => soilhydrology_vars%frost_table_col       , & ! [real(r8) (:)]  frost table depth (m)
       !
       t_soisno              => temperature_vars%t_soisno_col            , & ! [real(r8) (:,:)] snow-soil temperature (Kelvin) (-nlevsno+1:nlevgrnd)
       t_grnd                => temperature_vars%t_grnd_col              , & ! [real(r8) (:)] ground (snow/soil1/surfwater-mixed) temperature (Kelvin)
@@ -417,6 +424,10 @@ contains
             clm_idata_th%h2osoi_ice_col(c,j)         = h2osoi_ice(c,j)
             clm_idata_th%t_soisno_col(c,j)           = t_soisno(c,j)
         end do
+
+        clm_idata_th%zwt_col(c)         = zwt(c)
+        clm_idata_th%zwt_perched_col(c) = zwt_perched(c)
+        clm_idata_th%frost_table_col(c) = frost_table(c)
 
     end do
 
@@ -475,7 +486,7 @@ contains
     ! a few notes:
     !   - 'qflx_evap_soil' appears for total soil surface, esp. bare soil; 'qflx_ev_soil/snow/h2osfc' are actually applied for in soil water modules
     !   - 'qflx_ev_snow' vs. 'qflx_sub_snow': the former is for total evap from both solid/liq., the latter is from solid snow pack (normally shall be same)
-    !                        there is another variable 'qlfx_evap_grnd', which are those from liq. water when snow
+    !                        there is another variable 'qlfx_evap_grnd', which are those from liq. water when snow exists
     !--------------------------------------------------------------------------------------
 !
     do fc = 1,num_soilc
@@ -765,7 +776,8 @@ contains
 !--------------------------------------------------------------------------------------
   subroutine update_soil_moisture(clm_idata_th,     &
            bounds, num_soilc, filter_soilc,         &
-           soilstate_vars, waterstate_vars, waterflux_vars)
+           soilstate_vars, waterstate_vars,         &
+           waterflux_vars, soilhydrology_vars)
 
   !
   ! !DESCRIPTION:
@@ -779,9 +791,10 @@ contains
     type(bounds_type), intent(in) :: bounds
     integer, intent(in) :: num_soilc        ! number of column soil points in column filter
     integer, intent(in) :: filter_soilc(:)  ! column filter for soil points
-    type(soilstate_type), intent(inout)  :: soilstate_vars
-    type(waterstate_type), intent(inout) :: waterstate_vars
-    type(waterflux_type), intent(inout)  :: waterflux_vars
+    type(soilstate_type) ,    intent(inout) :: soilstate_vars
+    type(waterstate_type),    intent(inout) :: waterstate_vars
+    type(waterflux_type),     intent(inout) :: waterflux_vars
+    type(soilhydrology_type), intent(inout) :: soilhydrology_vars
 
     type(clm_interface_th_datatype), intent(in) :: clm_idata_th
 
@@ -805,7 +818,13 @@ contains
          qflx_h2osfc_surf       => waterflux_vars%qflx_h2osfc_surf_col        , & ! Output: [real(r8) (:)   ]  surface (pond) water runoff (mm/s)
          qflx_infl              => waterflux_vars%qflx_infl_col               , & ! Output: [real(r8) (:)   ]  infiltration (mm H2O /s)
          qflx_qrgwl             => waterflux_vars%qflx_qrgwl_col              , & ! Output: [real(r8) (:)   ]  qflx_surf at glaciers, wetlands, lakes
-         qflx_runoff            => waterflux_vars%qflx_runoff_col               & ! Output: [real(r8) (:)   ]  total water losses to currents from column (qflx_drain+qflx_surf+qflx_qrgwl) (mm H2O /s)
+         qflx_runoff            => waterflux_vars%qflx_runoff_col             , & ! Output: [real(r8) (:)   ]  total water losses to currents from column (qflx_drain+qflx_surf+qflx_qrgwl) (mm H2O /s)
+         qflx_evap_tot          => waterflux_vars%qflx_evap_tot_col           , & ! In/Output: [real(r8) (:)] ! col soil surface evaporation (mm H2O/s) (+ = to atm) (mmH2O/s, adjusted if any)
+         !
+         zwt                    => soilhydrology_vars%zwt_col                 , & ! Output: [real(r8) (:)   ]  water table depth (m)
+         zwt_perched            => soilhydrology_vars%zwt_perched_col         , & ! Output: [real(r8) (:)   ]  perched water table depth (m)
+         frost_table            => soilhydrology_vars%frost_table_col         , & ! Output: [real(r8) (:)   ]  frost table depth (m)
+         qcharge                => soilhydrology_vars%qcharge_col               & ! Output: [real(r8) (:)   ]  water recharge/charge from/to aquifer (interface btw unsaturated/saturated zones) (mm H2O /s)
     )
 
     ! states
@@ -850,9 +869,24 @@ contains
         qflx_qrgwl(c)         = 0._r8
         qflx_drain_perched(c) = 0._r8
 
+        !aquifer (ground-water) recharge rate
+        qcharge(c)            = clm_idata_th%qcharge_col(c)
+        zwt(c)                = clm_idata_th%zwt_col(c)
+        zwt_perched(c)        = clm_idata_th%zwt_perched_col(c)
+        frost_table(c)        = clm_idata_th%frost_table_col(c)
+
+
         ! add amount of ET adjusted by PFLOTRAN into 'qflx_surf' so that counted correctly in balance-checking
         ! NOTE: this is a work-around, especially when surface module not coupled with pflotran.
-        qflx_surf(c) = qflx_surf(c) - clm_idata_th%qflx_et_reduced_col(c)
+        !       (TODO) It's better to reduce individual ET
+        if(abs(clm_idata_th%qflx_et_reduced_col(c))>0._r8) then
+
+print *, 'ET-reduced?', qflx_evap_tot(c)*1800._r8, &
+(qflx_evap_tot(c)-clm_idata_th%qflx_et_reduced_col(c))*1800._r8
+print *, ''
+          qflx_evap_tot(c)    = qflx_evap_tot(c) - clm_idata_th%qflx_et_reduced_col(c)
+
+        endif
 
         !summary of all water loss to currents
         qflx_runoff(c) = qflx_drain(c) + qflx_surf(c)  + qflx_h2osfc_surf(c) + qflx_qrgwl(c) + qflx_drain_perched(c)
@@ -868,7 +902,7 @@ contains
 !--------------------------------------------------------------------------------------
   subroutine update_soil_temperature(clm_idata_th,     &
            bounds, num_soilc, filter_soilc,            &
-           temperature_vars)
+           temperature_vars, energyflux_vars)
 
   !
   ! !DESCRIPTION:
@@ -883,6 +917,7 @@ contains
     integer                             , intent(in)    :: num_soilc        ! number of column soil points in column filter
     integer                             , intent(in)    :: filter_soilc(:)  ! column filter for soil points
     type(temperature_type)              , intent(inout) :: temperature_vars
+    type(energyflux_type)               , intent(inout) :: energyflux_vars
     type(clm_interface_th_datatype)     , intent(in)    :: clm_idata_th
 
   ! !LOCAL VARIABLES:
@@ -934,13 +969,14 @@ contains
     if (pf_tmode) then
         call update_soil_temperature(clm_idata_th,      &
                    bounds, num_soilc, filter_soilc,     &
-                   temperature_vars)
+                   temperature_vars, energyflux_vars)
     end if
 
     if (pf_hmode) then
         call update_soil_moisture(clm_idata_th,         &
                    bounds, num_soilc, filter_soilc,     &
-                   soilstate_vars, waterstate_vars, waterflux_vars)
+                   soilstate_vars, waterstate_vars,     &
+                   waterflux_vars, soilhydrology_vars)
     end if
 
   end subroutine update_th_data_pf2clm
