@@ -22,7 +22,8 @@ module BalanceCheckMod
   use GridcellType       , only : grc_pp                
   use LandunitType       , only : lun_pp                
   use ColumnType         , only : col_pp                
-  use VegetationType          , only : veg_pp                
+  use VegetationType     , only : veg_pp
+  use clm_varctl         , only : pf_hmode, pf_tmode, pf_frzmode
   !
   ! !PUBLIC TYPES:
   implicit none
@@ -386,7 +387,7 @@ contains
              write(iulog,*)'clm model is stopping'
              call endrun(decomp_index=indexc, clmlevel=namec, msg=errmsg(__FILE__, __LINE__))
 
-          else if (abs(errh2o(indexc)) > 1.e-4_r8 .and. (nstep > 2) ) then
+          else if (abs(errh2o(indexc)) > 1.e-4_r8 .and. (nstep > 2) .and. (.not.pf_hmode)) then
 
              write(iulog,*)'clm model is stopping - error is greater than 1e-4 (mm)'
              write(iulog,*)'nstep                      = ',nstep
