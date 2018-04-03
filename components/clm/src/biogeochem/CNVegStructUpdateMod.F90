@@ -153,6 +153,17 @@ contains
             end if
             tlai(p) = max(0._r8, tlai(p))
 
+            !----------------------F.-M. Yuan: 2018-03-23---------------------------------------------------------------------
+            ! whenever max. LAI for any PFT is defined
+            if (laimx(ivt(p))>0._r8) then
+               if (tlai(p) >= laimx(ivt(p))) then
+                   peaklai(p) = 1 ! used in CNAllocation for reducing C allocation to leaf
+               else
+                   peaklai(p) = 0
+               end if
+            end if
+            !----------------------F.-M. Yuan: 2018-03-23---------------------------------------------------------------------
+
             ! update the stem area index and height based on LAI, stem mass, and veg type.
             ! With the exception of htop for woody vegetation, this follows the DGVM logic.
 

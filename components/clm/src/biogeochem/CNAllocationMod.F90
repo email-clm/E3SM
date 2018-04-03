@@ -780,6 +780,14 @@ contains
 
          f1 = froot_leaf(ivt(p))
          f2 = croot_stem(ivt(p))
+         !----------------------F.-M. Yuan (2018-03-23) ------------------------
+         ! when lai at maximum allowed for non-crop pfts (i.e. defined in parameter file for them),
+         ! reduce allocation to leaf
+         if (peaklai(p) == 1 .and. (.not.croplive(p)) ) then
+             f1 = 50.0_r8
+             ! this is an arbitrary value to extremely limit C allocation to leaf pool (inc. storage)
+         end if
+         !----------------------F.-M. Yuan (2018-03-23) ------------------------
 
          ! modified wood allocation to be 2.2 at npp=800 gC/m2/yr, 0.2 at npp=0,
          ! constrained so that it does not go lower than 0.2 (under negative annsum_npp)
@@ -3025,6 +3033,9 @@ contains
          leafp                        => phosphorusstate_vars%leafp_patch                      , &
          supplement_to_sminn_vr       => nitrogenflux_vars%supplement_to_sminn_vr_col          , &
          supplement_to_sminp_vr       => phosphorusflux_vars%supplement_to_sminp_vr_col        , &
+
+         peaklai                      => cnstate_vars%peaklai_patch                            , & ! Input:  [integer  (:)   ]  1: max allowed lai; 0: not at max
+
          ! for debug
          plant_n_uptake_flux          => nitrogenflux_vars%plant_n_uptake_flux                 , &
          plant_p_uptake_flux          => phosphorusflux_vars%plant_p_uptake_flux               , &
@@ -3123,6 +3134,14 @@ contains
              ! set some local allocation variables
              f1 = froot_leaf(ivt(p))
              f2 = croot_stem(ivt(p))
+             !----------------------F.-M. Yuan (2018-03-23) ------------------------
+             ! when lai at maximum allowed for non-crop pfts (i.e. defined in parameter file for them),
+             ! reduce allocation to leaf
+             if (peaklai(p) == 1 .and. (.not.croplive(p)) ) then
+                f1 = 50.0_r8
+                ! this is an arbitrary value to extremely limit C allocation to leaf pool (inc. storage)
+             end if
+             !----------------------F.-M. Yuan (2018-03-23) ------------------------
 
              ! modified wood allocation to be 2.2 at npp=800 gC/m2/yr, 0.2 at npp=0,
              ! constrained so that it does not go lower than 0.2 (under negative annsum_npp)
