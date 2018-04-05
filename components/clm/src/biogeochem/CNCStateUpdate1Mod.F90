@@ -278,6 +278,10 @@ contains
 
          ! maintenance respiration fluxes from xsmrpool
          cs%xsmrpool_patch(p) = cs%xsmrpool_patch(p) + cf%cpool_to_xsmrpool_patch(p)*dt
+         !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+         ! maintenace respiration pool fluxes (reallocation) from storage pool
+         cs%xsmrpool_patch(p) = cs%xsmrpool_patch(p) + cf%storage_to_xsmrpool_patch(p)*dt
+         !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
          cs%xsmrpool_patch(p) = cs%xsmrpool_patch(p) - cf%leaf_xsmr_patch(p)*dt
          cs%xsmrpool_patch(p) = cs%xsmrpool_patch(p) - cf%froot_xsmr_patch(p)*dt
          if (nu_com .ne. 'RD') then

@@ -231,6 +231,10 @@ module CNCarbonFluxType
      real(r8), pointer :: livestemc_to_deadstemc_patch              (:)     ! live stem C turnover (gC/m2/s)
      real(r8), pointer :: livecrootc_to_deadcrootc_patch            (:)     ! live coarse root C turnover (gC/m2/s)
 
+     !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+     real(r8), pointer :: storage_to_xsmrpool_patch                 (:)     ! storage to abstract C pool to meet excess MR demand (gC/m2/s)
+     !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+
      ! summary (diagnostic) flux variables, not involved in mass balance
      real(r8), pointer :: gpp_patch                                 (:)     ! (gC/m2/s) gross primary production 
      real(r8), pointer :: gpp_before_downreg_patch                  (:)     ! (gC/m2/s) gross primary production before down regulation
@@ -642,6 +646,8 @@ contains
         allocate(this%wood_harvestc_patch                      (begp:endp)) ; this%wood_harvestc_patch                    (:) = nan
         allocate(this%cinputs_patch                            (begp:endp)) ; this%cinputs_patch                          (:) = nan
         allocate(this%coutputs_patch                           (begp:endp)) ; this%coutputs_patch                         (:) = nan
+
+        allocate(this%storage_to_xsmrpool_patch                (begp:endp)) ; this%storage_to_xsmrpool_patch              (:) = nan
 
         allocate(this%plant_calloc_patch                       (begp:endp)) ; this%plant_calloc_patch                     (:) = nan
         allocate(this%excess_cflux_patch                       (begp:endp)) ; this%excess_cflux_patch                     (:) = nan
@@ -4228,6 +4234,7 @@ contains
           this%woodc_alloc_patch(i)                         = value_patch
           this%woodc_loss_patch(i)                          = value_patch
           this%xsmrpool_turnover_patch(i)                   = value_patch
+          this%storage_to_xsmrpool_patch(i)                 = value_patch
        end do
     end if !(.not.use_fates)
 

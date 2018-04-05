@@ -412,6 +412,11 @@ contains
     real(r8), pointer :: actual_immob_nh4             (:)
     real(r8), pointer :: benefit_pgpp_pleafc          (:)
 
+    !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+    real(r8) :: totcstorage                      !temporary variables for summing plant C and storage C
+    real(r8) :: stor_to_xsmr, fstor_to_xsmr, tmp_xsmr  !temporary variables for transfering storage C to xsmrpool
+    !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+
     !-----------------------------------------------------------------------
 
     associate(                                                                                   &
@@ -446,7 +451,7 @@ contains
          hui                          => crop_vars%gddplant_patch                              , & ! Input:  [real(r8) (:)   ]  =gdd since planting (gddplant)          
          leafout                      => crop_vars%gddtsoi_patch                               , & ! Input:  [real(r8) (:)   ]  =gdd from top soil layer temperature    
 
-         xsmrpool                     => carbonstate_vars%xsmrpool_patch                       , & ! Input:  [real(r8) (:)   ]  (gC/m2) temporary photosynthate C pool  
+         xsmrpool                     => carbonstate_vars%xsmrpool_patch                       , & ! Input:  [real(r8) (:)   ]  (gC/m2) abstract C pool to meet excess MR demand
          leafc                        => carbonstate_vars%leafc_patch                          , & ! Input:  [real(r8) (:)   ]                                          
          frootc                       => carbonstate_vars%frootc_patch                         , & ! Input:  [real(r8) (:)   ]                                          
          livestemc                    => carbonstate_vars%livestemc_patch                      , & ! Input:  [real(r8) (:)   ]                                          
@@ -454,11 +459,18 @@ contains
          plant_pdemand_col            => phosphorusflux_vars%plant_pdemand_col               , & ! Output:  [real(r8) (:,:) ]
          plant_ndemand_vr_col         => nitrogenflux_vars%plant_ndemand_vr_col              , & ! Output:  [real(r8) (:,:) ]
          plant_pdemand_vr_col         => phosphorusflux_vars%plant_pdemand_vr_col            , & ! Output:  [real(r8) (:,:) ]
+
+         cpool                        => carbonstate_vars%cpool_patch                        , & ! Input:  [real(r8) (:)   ]  (gC/m2)
+         leafc_storage                => carbonstate_vars%leafc_storage_patch                , & ! Input:  [real(r8) (:)   ]  (gC/m2)
+         frootc_storage               => carbonstate_vars%frootc_storage_patch               , & ! Input:  [real(r8) (:)   ]  (gC/m2)
+         livestemc_storage            => carbonstate_vars%livestemc_storage_patch            , & ! Input:  [real(r8) (:)   ]  (gC/m2)
+         livecrootc_storage           => carbonstate_vars%livecrootc_storage_patch           , & ! Input:  [real(r8) (:)   ]  (gC/m2)
+         grainc_storage               => carbonstate_vars%grainc_storage_patch               , & ! Input:  [real(r8) (:)   ]  (gC/m2)
          
          gddmaturity                  => cnstate_vars%gddmaturity_patch                        , & ! Input:  [real(r8) (:)   ]  gdd needed to harvest                   
          huileaf                      => cnstate_vars%huileaf_patch                            , & ! Input:  [real(r8) (:)   ]  heat unit index needed from planting to leaf emergence
          huigrain                     => cnstate_vars%huigrain_patch                           , & ! Input:  [real(r8) (:)   ]  same to reach vegetative maturity       
-         croplive                     => crop_vars%croplive_patch                           , & ! Input:  [logical  (:)   ]  flag, true if planted, not harvested     
+         croplive                     => crop_vars%croplive_patch                              , & ! Input:  [logical  (:)   ]  flag, true if planted, not harvested
          peaklai                      => cnstate_vars%peaklai_patch                            , & ! Input:  [integer  (:)   ]  1: max allowed lai; 0: not at max        
          !lgsf                        => cnstate_vars%lgsf_patch                               , & ! Input:  [real(r8) (:)   ]  long growing season factor [0-1]        
          aleafi                       => cnstate_vars%aleafi_patch                             , & ! Output: [real(r8) (:)   ]  saved allocation coefficient from phase 2
@@ -529,6 +541,10 @@ contains
          cpool_to_gresp_storage       => carbonflux_vars%cpool_to_gresp_storage_patch          , & ! Output: [real(r8) (:)   ]  allocation to growth respiration storage (gC/m2/s)
          cpool_to_grainc              => carbonflux_vars%cpool_to_grainc_patch                 , & ! Output: [real(r8) (:)   ]  allocation to grain C (gC/m2/s)         
          cpool_to_grainc_storage      => carbonflux_vars%cpool_to_grainc_storage_patch         , & ! Output: [real(r8) (:)   ]  allocation to grain C storage (gC/m2/s) 
+
+         !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+         storage_to_xsmrpool          => carbonflux_vars%storage_to_xsmrpool_patch             , & ! Output: [real(r8) (:)   ]
+         !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
         
          sminn_vr                     => nitrogenstate_vars%sminn_vr_col                       , & ! Input:  [real(r8) (:,:) ]  (gN/m3) soil mineral N                
          retransn                     => nitrogenstate_vars%retransn_patch                     , & ! Input:  [real(r8) (:)   ]  (gN/m2) plant pool of retranslocated N  
@@ -778,6 +794,54 @@ contains
             end if
             cpool_to_xsmrpool(p) = xsmrpool_recover(p)
          end if
+
+         !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+         if (storage_mobility(ivt(p))>0._r8 .and. storage_mobility(ivt(p))<=1._r8) then
+            ! if 'xsmrpool' potentially runs into deficit, mainly due to too much 'xsmr',
+            ! then let storage C meet its recovery as needed,
+            ! in addition to available photosynthate C as above.
+            storage_to_xsmrpool(p) = 0._r8
+            tmp_xsmr = xsmrpool(p) + cpool_to_xsmrpool(p)*dt             &
+                       -dt*( leaf_xsmr(p)+froot_xsmr(p)+livestem_xsmr(p) &
+                            +livecroot_xsmr(p)+grain_xsmr(p) )
+            if (tmp_xsmr<0._r8) then
+               ! summarizing storage C for using below
+               totcstorage = cpool(p)+leafc_storage(p)+frootc_storage(p)
+               if (woody(ivt(p)) == 1._r8) then
+                  totcstorage = totcstorage + livestemc_storage(p)       &
+                                            + livecrootc_storage(p)
+               else if (ivt(p) >= npcropmin) then
+                  if (croplive(p)) then
+                      totcstorage = totcstorage + livestemc_storage(p)   &
+                                                + grainc_storage(p)
+                  end if
+               end if
+
+               if (totcstorage>0._r8) then
+                  ! portion of total storage pools are immediately transferable to xsmr pool
+                  stor_to_xsmr = min(-tmp_xsmr, totcstorage*storage_mobility(ivt(p)))
+
+                  ! reducing individual storage C pools
+                  fstor_to_xsmr = max(0._r8, stor_to_xsmr / totcstorage)
+                  cpool(p)          = cpool(p) * (1._r8 - fstor_to_xsmr)
+                  leafc_storage(p)  = leafc_storage(p) * (1._r8 - fstor_to_xsmr)
+                  frootc_storage(p) = frootc_storage(p) * (1._r8 - fstor_to_xsmr)
+                  if (woody(ivt(p)) == 1.0_r8) then
+                     livestemc_storage(p)=livestemc_storage(p) * (1._r8 - fstor_to_xsmr)
+                     livecrootc_storage(p)=livecrootc_storage(p) * (1._r8 - fstor_to_xsmr)
+                  else if (ivt(p) >= npcropmin) then
+                     if (croplive(p)) then
+                        livestemc_storage(p)=livestemc_storage(p) * (1._r8 - fstor_to_xsmr)
+                        grainc_storage(p)=grainc_storage(p) * (1._r8 - fstor_to_xsmr)
+                     end if
+                  end if
+                  storage_to_xsmrpool(p) = stor_to_xsmr/dt
+               end if
+            end if
+
+         end if
+         !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+
 
          f1 = froot_leaf(ivt(p))
          f2 = croot_stem(ivt(p))
@@ -2907,6 +2971,11 @@ contains
     real(r8):: curmr, curmr_ratio         !xsmrpool temporary variables
     real(r8):: xsmr_ratio                 ! ratio of mr comes from non-structue carobn hydrate pool
     real(r8):: dt
+
+    !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+    real(r8) totclive, totcstorage        !temporary variables for summing plant living C and storage C
+    !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+
     !-----------------------------------------------------------------------
 
     associate(                                                                                 &
@@ -3036,6 +3105,15 @@ contains
          supplement_to_sminn_vr       => nitrogenflux_vars%supplement_to_sminn_vr_col          , &
          supplement_to_sminp_vr       => phosphorusflux_vars%supplement_to_sminp_vr_col        , &
 
+         cpool                        => carbonstate_vars%cpool_patch                          , & ! Input:  [real(r8) (:)   ]  (gN/m2)
+         frootc                       => carbonstate_vars%frootc_patch                         , & ! Input:  [real(r8) (:)   ]  (gC/m2)
+         livecrootc                   => carbonstate_vars%livecrootc_patch                     , & ! Input:  [real(r8) (:)   ]  (gC/m2)
+         livestemc                    => carbonstate_vars%livestemc_patch                      , & ! Input:  [real(r8) (:)   ]  (gC/m2)
+         grainc                       => carbonstate_vars%grainc_patch                         , & ! Input:  [real(r8) (:)   ]  (gC/m2)
+         frootc_storage               => carbonstate_vars%frootc_storage_patch                 , & ! Input:  [real(r8) (:)   ]  (gC/m2)
+         livestemc_storage            => carbonstate_vars%livestemc_storage_patch              , & ! Input:  [real(r8) (:)   ]  (gC/m2)
+         livecrootc_storage           => carbonstate_vars%livecrootc_storage_patch             , & ! Input:  [real(r8) (:)   ]  (gC/m2)
+         grainc_storage               => carbonstate_vars%grainc_storage_patch                 , & ! Input:  [real(r8) (:)   ]  (gC/m2)
          peaklai                      => cnstate_vars%peaklai_patch                            , & ! Input:  [integer  (:)   ]  1: max allowed lai; 0: not at max
 
          ! for debug
@@ -3178,6 +3256,40 @@ contains
              cpdw = deadwdcp(ivt(p))
 
              fcur = fcur2(ivt(p))
+
+
+             !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+             if (storage_mobility(ivt(p))>0._r8 .and. storage_mobility(ivt(p))<=1._r8) then
+                ! 'fcur' may not be constant all the time that would cause too much or too less C storage
+                totcstorage = leafc_storage(p)+frootc_storage(p)
+                totclive    = leafc(p)+frootc(p)
+                if (woody(ivt(p)) == 1._r8) then
+                   totcstorage = totcstorage + livestemc_storage(p)  &
+                                             + livecrootc_storage(p)
+                   totclive    = totclive    + livestemc(p)          &
+                                             + livecrootc(p)
+                endif
+                totclive = totclive + totcstorage
+
+                ! the following adjusts '1.0-fcur' by checking total storage C fraction (living only)
+                if(totclive>0._r8) then
+                   ! '0.50' of criteria currently arbitrary, and chosen together with the expoential reducing k value below.
+                   !  Exponentially slowing-down storage allocations if greater than '0.30' of total storage C pool size
+                   !  the '-22.5' exponential decline coeff value would reduce storage C allocation fraction by ~90% at 0.60 and ~99% at 0.75 of stor/totc
+                   if(totcstorage>0.50_r8*totclive) then
+                      fcur = 1._r8 - (1._r8-fcur2(ivt(p))) * exp(-22.5_r8*max(totcstorage/totclive-0.50_r8,0._r8))
+
+                      ! better to have storage allocations to keep storage pool live.
+                      ! '0.10' of low-limit criteria below is arbitrary for rising '1-fcur'
+                      ! the '-46.5' exponential decline coeff value would reduce structural C allocation fraction to ~10% of fcur at 0.05 and ~1% at about 0.001 of stor/totc
+                   else if (totcstorage<0.10_r8*totclive) then
+                      fcur = fcur2(ivt(p)) * exp(-46.5_r8*max(0.10_r8-totcstorage/totclive,0._r8))
+                   end if
+                end if
+
+             end if
+             !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+
 
              if (ivt(p) >= npcropmin) then ! skip 2 generic crops
                  if (croplive(p)) then
