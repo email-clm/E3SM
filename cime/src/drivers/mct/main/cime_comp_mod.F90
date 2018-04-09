@@ -3934,6 +3934,7 @@ contains
           write(timing_file,'(a,i8.8,a1,i5.5)') &
                trim(tchkpt_dir)//"/model_timing"//trim(cpl_inst_tag)//"_",ymd,"_",tod
 
+#if 0
           call t_set_prefixf("CPL:")
           if (output_perf) then
              call t_prf(filename=trim(timing_file), mpicom=mpicom_GLOID, &
@@ -3943,6 +3944,7 @@ contains
                   num_outpe=0)
           endif
           call t_unset_prefixf()
+#endif
 
           call t_startf("CPL:sync2_tprof")
           call mpi_barrier(mpicom_GLOID,ierr)
@@ -4046,7 +4048,7 @@ contains
     call t_startf("sync3_tprof")
     call mpi_barrier(mpicom_GLOID,ierr)
     call t_stopf("sync3_tprof")
-
+#if 0
     if (output_perf) then
        call t_prf(trim(timing_dir)//'/model_timing'//trim(cpl_inst_tag), &
             mpicom=mpicom_GLOID, output_thispe=output_perf)
@@ -4054,7 +4056,7 @@ contains
        call t_prf(trim(timing_dir)//'/model_timing'//trim(cpl_inst_tag), &
             mpicom=mpicom_GLOID)
     endif
-
+#endif
     call t_finalizef()
 
   end subroutine cime_final
