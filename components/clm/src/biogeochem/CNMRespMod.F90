@@ -106,9 +106,10 @@ contains
     !-----------------------------------------------------------------------
 
     associate(                                                        &    
-         ivt            =>    veg_pp%itype                             , & ! Input:  [integer  (:)   ]  patch vegetation type                                
-         woody          =>    veg_vp%woody                      , & ! Input:  [real(r8) (:)   ]  binary flag for woody lifeform (1=woody, 0=not woody)
-         br_xr          =>    veg_vp%br_xr                      , & ! Input:  [real(r8) (:)   ]  base rate for excess respiration
+         ivt            =>    veg_pp%itype                          , & ! Input:  [integer  (:)   ]  patch vegetation type
+         woody          =>    veg_vp%woody                          , & ! Input:  [real(r8) (:)   ]  binary flag for woody lifeform (1=woody, 0=not woody)
+         br_xr          =>    veg_vp%br_xr                          , & ! Input:  [real(r8) (:)   ]  base rate for excess respiration
+         evergreen      =>    veg_vp%evergreen                      , & ! Input:  [real(r8) (:) ]  binary flag for evergreen leaf habit (0 or 1)
          frac_veg_nosno =>    canopystate_vars%frac_veg_nosno_patch , & ! Input:  [integer  (:)   ]  fraction of vegetation not covered by snow (0 OR 1) [-]
          laisun         =>    canopystate_vars%laisun_patch         , & ! Input:  [real(r8) (:)   ]  sunlit projected leaf area index                  
          laisha         =>    canopystate_vars%laisha_patch         , & ! Input:  [real(r8) (:)   ]  shaded projected leaf area index                  
@@ -122,6 +123,8 @@ contains
          lmrsha         =>    photosyns_vars%lmrsha_patch           , & ! Input:  [real(r8) (:)   ]  shaded leaf maintenance respiration rate (umol CO2/m**2/s)
 
          cpool          =>    carbonstate_vars%cpool_patch          , & ! Input: [real(r8) (:)   ]   plant carbon pool (gC m-2)
+         leafc          =>    carbonstate_vars%leafc_patch          , & ! Input:  [real(r8) (:)   ]
+         frootc         =>    carbonstate_vars%frootc_patch         , & ! Input:  [real(r8) (:)   ]
 
          leaf_mr        =>    carbonflux_vars%leaf_mr_patch         , & ! Output: [real(r8) (:)   ]                                                    
          froot_mr       =>    carbonflux_vars%froot_mr_patch        , & ! Output: [real(r8) (:)   ]                                                    
@@ -184,6 +187,16 @@ contains
 
          end if
 
+         !----------------------F.-M. Yuan (2018-04-09): maintenance resp. limiting ------------------------
+         ! for evergreen PFT, it may cause problem if all 'leafc' going to zero
+         ! when competing with other PFT, it possible to die out forever.
+         ! note: '0.01 gC/m2' is an arbitrary criteria.
+         if (evergreen(ivt(p))==1._r8 .and. leafc(p)<0.01_r8) then
+            leaf_mr(p)   = 0._r8
+         end if
+         !----------------------F.-M. Yuan (2018-04-09): maintenance resp. limiting ------------------------
+
+
          if (woody(ivt(p)) == 1) then
             livestem_mr(p) = livestemn(p)*br_mr*tc
             livecroot_mr(p) = livecrootn(p)*br_mr*tc
@@ -218,6 +231,17 @@ contains
             ! function of temperature and N content.
 
             froot_mr(p) = froot_mr(p) + frootn(p)*br_mr*tcsoi(c,j)*rootfr(p,j)
+
+            !----------------------F.-M. Yuan (2018-04-09): maintenance resp. limiting ------------------------
+            ! for any PFT, it may cause problem if all 'frootc' going to zero
+            ! when competing with other PFT, it possible to die out forever.
+            ! note: '0.01 gC/m2' is an arbitrary criteria.
+            if (frootc(p)<0.01_r8) then
+                froot_mr(p) = 0._r8
+            end if
+            !----------------------F.-M. Yuan (2018-04-09): maintenance resp. limiting ------------------------
+
+
          end do
       end do
 
