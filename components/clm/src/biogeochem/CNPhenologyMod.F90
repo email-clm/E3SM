@@ -538,12 +538,17 @@ contains
     real(r8):: ws_flag        !winter-summer solstice flag (0 or 1)
     real(r8):: crit_onset_gdd !critical onset growing degree-day sum
     real(r8):: soilt
+    !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+    real(r8):: totc_stor, totn_stor, totp_stor
+    real(r8):: f1 = 0.0_r8, f2 = 0.5_r8
+    !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+
     !-----------------------------------------------------------------------
 
     associate(                                                                                             & 
-         ivt                                 =>    veg_pp%itype                                             , & ! Input:  [integer   (:)   ]  pft vegetation type                                
-         dayl                                =>    grc_pp%dayl                                              , & ! Input:  [real(r8)  (:)   ]  daylength (s)
-         prev_dayl                           =>    grc_pp%prev_dayl                                         , & ! Input:  [real(r8)  (:)   ]  daylength from previous time step (s)
+         ivt                                 =>    veg_pp%itype                                          , & ! Input:  [integer   (:)   ]  pft vegetation type
+         dayl                                =>    grc_pp%dayl                                           , & ! Input:  [real(r8)  (:)   ]  daylength (s)
+         prev_dayl                           =>    grc_pp%prev_dayl                                      , & ! Input:  [real(r8)  (:)   ]  daylength from previous time step (s)
          
          season_decid                        =>    veg_vp%season_decid                                   , & ! Input:  [real(r8)  (:)   ]  binary flag for seasonal-deciduous leaf habit (0 or 1)
          woody                               =>    veg_vp%woody                                          , & ! Input:  [real(r8)  (:)   ]  binary flag for woody lifeform (1=woody, 0=not woody)
@@ -567,6 +572,7 @@ contains
          bgtr                                =>    cnstate_vars%bgtr_patch                               , & ! Output: [real(r8)  (:)   ]  background transfer growth rate (1/s)             
          lgsf                                =>    cnstate_vars%lgsf_patch                               , & ! Output: [real(r8)  (:)   ]  long growing season factor [0-1]                  
          
+         cpool                               =>    carbonstate_vars%cpool_patch                          , & ! Input:  [real(r8) (:)   ]   (gC/m2)
          leafc_storage                       =>    carbonstate_vars%leafc_storage_patch                  , & ! Input:  [real(r8)  (:)   ]  (gC/m2) leaf C storage                            
          frootc_storage                      =>    carbonstate_vars%frootc_storage_patch                 , & ! Input:  [real(r8)  (:)   ]  (gC/m2) fine root C storage                       
          livestemc_storage                   =>    carbonstate_vars%livestemc_storage_patch              , & ! Input:  [real(r8)  (:)   ]  (gC/m2) live stem C storage                       
@@ -581,6 +587,7 @@ contains
          livecrootc_xfer                     =>    carbonstate_vars%livecrootc_xfer_patch                , & ! Output:  [real(r8) (:)   ]  (gC/m2) live coarse root C transfer               
          deadcrootc_xfer                     =>    carbonstate_vars%deadcrootc_xfer_patch                , & ! Output:  [real(r8) (:)   ]  (gC/m2) dead coarse root C transfer               
          
+         npool                               =>    nitrogenstate_vars%npool_patch                        , & ! Input:  [real(r8)  (:)   ]  (gN/m2)
          leafn_storage                       =>    nitrogenstate_vars%leafn_storage_patch                , & ! Input:  [real(r8)  (:)   ]  (gN/m2) leaf N storage                            
          frootn_storage                      =>    nitrogenstate_vars%frootn_storage_patch               , & ! Input:  [real(r8)  (:)   ]  (gN/m2) fine root N storage                       
          livestemn_storage                   =>    nitrogenstate_vars%livestemn_storage_patch            , & ! Input:  [real(r8)  (:)   ]  (gN/m2) live stem N storage                       
@@ -589,6 +596,7 @@ contains
          deadcrootn_storage                  =>    nitrogenstate_vars%deadcrootn_storage_patch           , & ! Input:  [real(r8)  (:)   ]  (gN/m2) dead coarse root N storage                
 
          !! phosphorus
+         ppool                               =>    phosphorusstate_vars%ppool_patch                        , & ! Input:  [real(r8)  (:)   ]  (gP/m2)
          leafp_storage                       =>    phosphorusstate_vars%leafp_storage_patch                , & ! Input:  [real(r8)  (:)   ]  (gP/m2) leaf P storage                            
          frootp_storage                      =>    phosphorusstate_vars%frootp_storage_patch               , & ! Input:  [real(r8)  (:)   ]  (gP/m2) fine root P storage                       
          livestemp_storage                   =>    phosphorusstate_vars%livestemp_storage_patch            , & ! Input:  [real(r8)  (:)   ]  (gP/m2) live stem P storage                       
@@ -803,6 +811,69 @@ contains
                   ! this code was originally handled with call cn_storage_to_xfer(p)
                   ! inlined during vectorization
 
+
+                  !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+                  if (storage_mobility(ivt(p))>0._r8 .and. storage_mobility(ivt(p))<=1._r8) then
+                     ! Allow mobilization among storage pools for leaf/root regrowth,
+                     ! especially if leaf/froot storage exausted before onset stage.
+                     ! This is true for deciduous-type plants with leaf longevity ('leaf_long' in parameter file)
+                     ! less than 1 yrs (or annuals without seeds, in which 'froot_long' MUST be longer than 1 yrs)
+
+                     totc_stor = leafc_storage(p) + frootc_storage(p) + cpool(p)
+                     totn_stor = leafn_storage(p) + frootn_storage(p) + npool(p)
+                     totp_stor = leafp_storage(p) + frootp_storage(p) + ppool(p)
+                     if (woody(ivt(p)) == 1.0_r8) then
+                        totc_stor = totc_stor + livestemc_storage(p) + livecrootc_storage(p) &
+                                              + deadstemc_storage(p) + deadcrootc_storage(p)
+                        totn_stor = totn_stor + livestemn_storage(p) + livecrootn_storage(p) &
+                                              + deadstemn_storage(p) + deadcrootn_storage(p)
+                        totp_stor = totp_stor + livestemp_xfer(p) + livecrootp_storage(p) &
+                                              + deadstemp_storage(p) + deadcrootp_storage(p)
+                     end if
+
+                     ! NOTE: if 'f1' set to 0.0 (default), it's same as unmodified version
+                     f1 = storage_mobility(ivt(p))   ! fraction of total storage can be mobilized
+                     f2 = 0.90_r8                    ! fraction of mobilized storage into 'leaf_storage', the rest into 'froot_storage'
+
+                     if (totc_stor>0._r8) then
+                        f1 = f1 &
+                            *(1.0_r8-exp(-46.5_r8*max(0.10_r8-leafc_storage(p)/totc_stor,0._r8)))
+
+                        ! the following update of storage pools might not be following protocols for CLM,
+                        ! but is convenient.
+                        ! NOTE: it's supposing that C/N/P all mobilized together
+                        leafc_storage(p)  = leafc_storage(p)*(1._r8-f1)+totc_stor*f1*f2
+                        leafn_storage(p)  = leafn_storage(p)*(1._r8-f1)+totn_stor*f1*f2
+                        leafp_storage(p)  = leafp_storage(p)*(1._r8-f1)+totp_stor*f1*f2
+
+                        frootc_storage(p) = frootc_storage(p)*(1._r8-f1)+totc_stor*f1*(1._r8-f2)
+                        frootn_storage(p) = frootn_storage(p)*(1._r8-f1)+totn_stor*f1*(1._r8-f2)
+                        frootp_storage(p) = frootp_storage(p)*(1._r8-f1)+totp_stor*f1*(1._r8-f2)
+
+                        cpool(p)          = cpool(p)*(1._r8-f1)
+                        npool(p)          = npool(p)*(1._r8-f1)
+                        ppool(p)          = ppool(p)*(1._r8-f1)
+                        if (woody(ivt(p)) == 1.0_r8) then
+                           livestemc_storage(p)  = livestemc_storage(p)*(1._r8-f1)
+                           deadstemc_storage(p)  = deadstemc_storage(p)*(1._r8-f1)
+                           livecrootc_storage(p) = livecrootc_storage(p)*(1._r8-f1)
+                           deadcrootc_storage(p) = deadcrootc_storage(p)*(1._r8-f1)
+
+                           livestemn_storage(p)  = livestemn_storage(p)*(1._r8-f1)
+                           deadstemn_storage(p)  = deadstemn_storage(p)*(1._r8-f1)
+                           livecrootn_storage(p) = livecrootn_storage(p)*(1._r8-f1)
+                           deadcrootn_storage(p) = deadcrootn_storage(p)*(1._r8-f1)
+
+                           livestemp_storage(p)  = livestemp_storage(p)*(1._r8-f1)
+                           deadstemp_storage(p)  = deadstemp_storage(p)*(1._r8-f1)
+                           livecrootp_storage(p) = livecrootp_storage(p)*(1._r8-f1)
+                           deadcrootp_storage(p) = deadcrootp_storage(p)*(1._r8-f1)
+                        end if
+                     end if
+                  end if
+                  !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+
+
                   ! set carbon fluxes for shifting storage pools to transfer pools
                   leafc_storage_to_xfer(p)  = fstor2tran * leafc_storage(p)/dt
                   frootc_storage_to_xfer(p) = fstor2tran * frootc_storage(p)/dt
@@ -908,6 +979,11 @@ contains
     real(r8):: crit_onset_gdd  ! degree days for onset trigger
     real(r8):: soilt           ! temperature of top soil layer
     real(r8):: psi             ! water stress of top soil layer
+    !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+    real(r8):: totc_stor, totn_stor, totp_stor
+    real(r8):: f1 = 0.0_r8, f2 = 0.50_r8
+    !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+
     !-----------------------------------------------------------------------
 
     associate(                                                                                             & 
@@ -943,6 +1019,7 @@ contains
          bgtr                                =>    cnstate_vars%bgtr_patch                               , & ! Output:  [real(r8) (:)   ]  background transfer growth rate (1/s)             
          annavg_t2m                          =>    cnstate_vars%annavg_t2m_patch                         , & ! Output:  [real(r8) (:)   ]  annual average 2m air temperature (K)             
      
+         cpool                               =>    carbonstate_vars%cpool_patch                          , & ! Input:  [real(r8) (:)   ]   (gC/m2)
          leafc_storage                       =>    carbonstate_vars%leafc_storage_patch                  , & ! Input:  [real(r8)  (:)   ]  (gC/m2) leaf C storage                            
          frootc_storage                      =>    carbonstate_vars%frootc_storage_patch                 , & ! Input:  [real(r8)  (:)   ]  (gC/m2) fine root C storage                       
          livestemc_storage                   =>    carbonstate_vars%livestemc_storage_patch              , & ! Input:  [real(r8)  (:)   ]  (gC/m2) live stem C storage                       
@@ -957,6 +1034,7 @@ contains
          livecrootc_xfer                     =>    carbonstate_vars%livecrootc_xfer_patch                , & ! Output:  [real(r8) (:)   ]  (gC/m2) live coarse root C transfer               
          deadcrootc_xfer                     =>    carbonstate_vars%deadcrootc_xfer_patch                , & ! Output:  [real(r8) (:)   ]  (gC/m2) dead coarse root C transfer               
          
+         npool                               =>    nitrogenstate_vars%npool_patch                        , & ! Input:  [real(r8)  (:)   ]  (gN/m2)
          leafn_storage                       =>    nitrogenstate_vars%leafn_storage_patch                , & ! Input:  [real(r8)  (:)   ]  (gN/m2) leaf N storage                            
          frootn_storage                      =>    nitrogenstate_vars%frootn_storage_patch               , & ! Input:  [real(r8)  (:)   ]  (gN/m2) fine root N storage                       
          livestemn_storage                   =>    nitrogenstate_vars%livestemn_storage_patch            , & ! Input:  [real(r8)  (:)   ]  (gN/m2) live stem N storage                       
@@ -970,7 +1048,7 @@ contains
          livecrootn_xfer                     =>    nitrogenstate_vars%livecrootn_xfer_patch              , & ! Output:  [real(r8) (:)   ]  (gN/m2) live coarse root N transfer               
          deadcrootn_xfer                     =>    nitrogenstate_vars%deadcrootn_xfer_patch              , & ! Output:  [real(r8) (:)   ]  (gN/m2) dead coarse root N transfer               
 
-
+         ppool                               =>    phosphorusstate_vars%ppool_patch                        , & ! Input:  [real(r8)  (:)   ]  (gP/m2)
          leafp_storage                       =>    phosphorusstate_vars%leafp_storage_patch                , & ! Input:  [real(r8)  (:)   ]  (gP/m2) leaf P storage                            
          frootp_storage                      =>    phosphorusstate_vars%frootp_storage_patch               , & ! Input:  [real(r8)  (:)   ]  (gP/m2) fine root P storage                       
          livestemp_storage                   =>    phosphorusstate_vars%livestemp_storage_patch            , & ! Input:  [real(r8)  (:)   ]  (gP/m2) live stem P storage                       
@@ -1192,6 +1270,69 @@ contains
                   onset_gdd(p) = 0._r8
                   onset_swi(p) = 0._r8
                   onset_counter(p) = ndays_on * secspday
+
+
+                  !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+                  if (storage_mobility(ivt(p))>0._r8 .and. storage_mobility(ivt(p))<=1._r8) then
+                     ! Allow mobilization among storage pools for leaf/root regrowth,
+                     ! especially if leaf/froot storage exausted before onset stage.
+                     ! This is true for deciduous-type plants with leaf longevity ('leaf_long' in parameter file)
+                     ! less than 1 yrs (or annuals without seeds, in which 'froot_long' MUST be longer than 1 yrs)
+
+                     totc_stor = leafc_storage(p) + frootc_storage(p) + cpool(p)
+                     totn_stor = leafn_storage(p) + frootn_storage(p) + npool(p)
+                     totp_stor = leafp_storage(p) + frootp_storage(p) + ppool(p)
+                     if (woody(ivt(p)) == 1.0_r8) then
+                        totc_stor = totc_stor + livestemc_storage(p) + livecrootc_storage(p) &
+                                              + deadstemc_storage(p) + deadcrootc_storage(p)
+                        totn_stor = totn_stor + livestemn_storage(p) + livecrootn_storage(p) &
+                                              + deadstemn_storage(p) + deadcrootn_storage(p)
+                        totp_stor = totp_stor + livestemp_xfer(p) + livecrootp_storage(p) &
+                                              + deadstemp_storage(p) + deadcrootp_storage(p)
+                     end if
+
+                     ! NOTE: if 'f1' set to 0.0 (default), it's same as unmodified version
+                     f1 = storage_mobility(ivt(p))   ! fraction of total storage can be mobilized
+                     f2 = 0.90_r8                    ! fraction of mobilized storage into 'leaf_storage', the rest into 'froot_storage'
+
+                     if (totc_stor>0._r8) then
+                        f1 = f1 &
+                            *(1.0_r8-exp(-46.5_r8*max(0.10_r8-leafc_storage(p)/totc_stor,0._r8)))
+
+                        ! the following update of storage pools might not be following protocols for CLM,
+                        ! but is convenient.
+                        ! NOTE: it's supposing that C/N/P all mobilized together (may be inappropriate)
+                        leafc_storage(p)  = leafc_storage(p)*(1._r8-f1)+totc_stor*f1*f2
+                        leafn_storage(p)  = leafn_storage(p)*(1._r8-f1)+totn_stor*f1*f2
+                        leafp_storage(p)  = leafp_storage(p)*(1._r8-f1)+totp_stor*f1*f2
+
+                        frootc_storage(p) = frootc_storage(p)*(1._r8-f1)+totc_stor*f1*(1._r8-f2)
+                        frootn_storage(p) = frootn_storage(p)*(1._r8-f1)+totn_stor*f1*(1._r8-f2)
+                        frootp_storage(p) = frootp_storage(p)*(1._r8-f1)+totp_stor*f1*(1._r8-f2)
+
+                        cpool(p)          = cpool(p)*(1._r8-f1)
+                        npool(p)          = npool(p)*(1._r8-f1)
+                        ppool(p)          = ppool(p)*(1._r8-f1)
+                        if (woody(ivt(p)) == 1.0_r8) then
+                           livestemc_storage(p)  = livestemc_storage(p)*(1._r8-f1)
+                           deadstemc_storage(p)  = deadstemc_storage(p)*(1._r8-f1)
+                           livecrootc_storage(p) = livecrootc_storage(p)*(1._r8-f1)
+                           deadcrootc_storage(p) = deadcrootc_storage(p)*(1._r8-f1)
+
+                           livestemn_storage(p)  = livestemn_storage(p)*(1._r8-f1)
+                           deadstemn_storage(p)  = deadstemn_storage(p)*(1._r8-f1)
+                           livecrootn_storage(p) = livecrootn_storage(p)*(1._r8-f1)
+                           deadcrootn_storage(p) = deadcrootn_storage(p)*(1._r8-f1)
+
+                           livestemp_storage(p)  = livestemp_storage(p)*(1._r8-f1)
+                           deadstemp_storage(p)  = deadstemp_storage(p)*(1._r8-f1)
+                           livecrootp_storage(p) = livecrootp_storage(p)*(1._r8-f1)
+                           deadcrootp_storage(p) = deadcrootp_storage(p)*(1._r8-f1)
+                        end if
+                     end if
+                  end if
+                  !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+
 
                   ! call subroutine to move all the storage pools into transfer pools,
                   ! where they will be transfered to displayed growth over the onset period.
