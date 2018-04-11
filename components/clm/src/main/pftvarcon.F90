@@ -284,9 +284,10 @@ module pftvarcon
   integer :: nshrub                            ! pft index for last type of shrub ('woody' type is 2, otherwise 1 for tree)
   integer :: ngraminoid                        ! pft index for last type of graminoid ('woody' type is 0)
   integer :: nnonvascular                      ! pft index for last type of non-vascular ('froot_leaf' not greater than 0)
-  integer, allocatable :: needleleaf(:)        ! needle-leaf flag (0 or 1)
-  integer, allocatable :: nonvascular(:)       ! nonvascular plant lifeform flag (0 or 1-moss or 2-lichen)
-  integer, allocatable :: nfixer(:)            ! N-fixer flag (0 or 1)
+  integer,  allocatable :: needleleaf(:)       ! needle-leaf flag (0 or 1)
+  integer,  allocatable :: nonvascular(:)      ! nonvascular plant lifeform flag (0 or 1-moss or 2-lichen)
+  integer,  allocatable :: nfixer(:)           ! N-fixer flag (0 or 1)
+  real(r8), allocatable :: storage_mobility(:) ! total storage pool mobility  (0 - 1.0) so that storage may be used for MR or regrowth during onset stage
   !----------------------F.-M. Yuan (2018-03-23): user-defined parameter file ---------------------------------------------------------------------
 
   !
@@ -551,6 +552,7 @@ contains
     allocate( needleleaf         (0:mxpft) )
     allocate( nonvascular        (0:mxpft) )
     allocate( nfixer             (0:mxpft) )
+    allocate( storage_mobility   (0:mxpft) )
   !----------------------F.-M. Yuan (2018-03-23): user-defined parameter file ---------------------------------------------------------------------
 
     ! Set specific vegetation type values
@@ -954,7 +956,12 @@ contains
     if (.not. readv) br_xr(:) = 0._r8
     call ncd_io('tc_stress', tc_stress, 'read', ncid, readvar=readv, posNOTonfile=.true.)
     if ( .not. readv) call endrun(msg='ERROR:  error in reading in pft data'//errMsg(__FILE__,__LINE__))
-       
+
+    !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+    call ncd_io('storage_mobility',storage_mobility(0:npft-1), 'read', ncid, readvar=readv)
+    if ( .not. readv ) storage_mobility(:)=0._r8
+    !----------------------F.-M. Yuan (2018-03-26): storage pool tunning ------------------------
+
     call ncd_io('mergetoclmpft', mergetoclmpft(0:npft-1), 'read', ncid, readvar=readv)
     if ( .not. readv ) then
        do i = 0, mxpft

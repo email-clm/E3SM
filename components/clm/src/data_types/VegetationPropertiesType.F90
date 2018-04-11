@@ -141,8 +141,9 @@ module VegetationPropertiesType
      real(r8)              :: tc_stress           !Critial temperature for moisture stress
 
      !----------------------F.-M. Yuan (2018-03-23): user-defined parameter file ---------------------------------------------------------------------
-     integer, allocatable :: nonvascular(:)       ! nonvascular plant lifeform flag (0 or 1-moss or 2-lichen)
-     integer, allocatable :: nfixer(:)            ! N-fixer flag (0 or 1)
+     integer, allocatable  :: nonvascular(:)      ! nonvascular plant lifeform flag (0 or 1-moss or 2-lichen)
+     integer, allocatable  :: nfixer(:)           ! N-fixer flag (0 or 1)
+     real(r8), allocatable :: storage_mobility(:) ! total storage pool mobility  (0 - 1.0) so that storage may be used for MR or regrowth during onset stage
      !----------------------F.-M. Yuan (2018-03-23): user-defined parameter file ---------------------------------------------------------------------
 
    contains
@@ -184,6 +185,7 @@ contains
     !
     !----------------------F.-M. Yuan (2018-03-23): user-defined parameter file ---------------------------------------------------------------------
     use pftvarcon , only : nonvascular, nfixer
+    use pftvarcon , only : storage_mobility
     !----------------------F.-M. Yuan (2018-03-23): user-defined parameter file ---------------------------------------------------------------------
     
     class (vegetation_properties_type) :: this
@@ -295,6 +297,7 @@ contains
     !----------------------F.-M. Yuan (2018-03-23): user-defined parameter file ---------------------------------------------------------------------
     allocate(this%nonvascular(0:numpft))                         ; this%nonvascular(:)           =huge(1)
     allocate(this%nfixer(0:numpft))                              ; this%nfixer(:)                =huge(1)
+    allocate(this%storage_mobility(0:numpft))                    ; this%storage_mobility(:)      =nan
     !----------------------F.-M. Yuan (2018-03-23): user-defined parameter file ---------------------------------------------------------------------
 
     do m = 0,numpft
@@ -385,6 +388,7 @@ contains
     !----------------------F.-M. Yuan (2018-03-23): user-defined parameter file ---------------------------------------------------------------------
        this%nonvascular(m)  = nonvascular(m)
        this%nfixer(m)       = nfixer(m)
+       this%storage_mobility(m) = storage_mobility(m)
     !----------------------F.-M. Yuan (2018-03-23): user-defined parameter file ---------------------------------------------------------------------
 
     end do

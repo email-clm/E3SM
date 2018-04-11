@@ -545,8 +545,9 @@ contains
          dayl                                =>    grc_pp%dayl                                              , & ! Input:  [real(r8)  (:)   ]  daylength (s)
          prev_dayl                           =>    grc_pp%prev_dayl                                         , & ! Input:  [real(r8)  (:)   ]  daylength from previous time step (s)
          
-         season_decid                        =>    veg_vp%season_decid                               , & ! Input:  [real(r8)  (:)   ]  binary flag for seasonal-deciduous leaf habit (0 or 1)
-         woody                               =>    veg_vp%woody                                      , & ! Input:  [real(r8)  (:)   ]  binary flag for woody lifeform (1=woody, 0=not woody)
+         season_decid                        =>    veg_vp%season_decid                                   , & ! Input:  [real(r8)  (:)   ]  binary flag for seasonal-deciduous leaf habit (0 or 1)
+         woody                               =>    veg_vp%woody                                          , & ! Input:  [real(r8)  (:)   ]  binary flag for woody lifeform (1=woody, 0=not woody)
+         storage_mobility                    =>    veg_vp%storage_mobility                               , & ! Input:  [real(r8)  (:)   ]  total storage pool mobility  (0 - 1.0)
          
          t_soisno                            =>    temperature_vars%t_soisno_col                         , & ! Input:  [real(r8)  (:,:) ]  soil temperature (Kelvin)  (-nlevsno+1:nlevgrnd)
          
@@ -910,13 +911,14 @@ contains
     !-----------------------------------------------------------------------
 
     associate(                                                                                             & 
-         ivt                                 =>    veg_pp%itype                                             , & ! Input:  [integer   (:)   ]  pft vegetation type                                
-         dayl                                =>    grc_pp%dayl                                              , & ! Input:  [real(r8)  (:)   ]  daylength (s)
+         ivt                                 =>    veg_pp%itype                                          , & ! Input:  [integer   (:)   ]  pft vegetation type
+         dayl                                =>    grc_pp%dayl                                           , & ! Input:  [real(r8)  (:)   ]  daylength (s)
          
-         leaf_long                           =>    veg_vp%leaf_long                                  , & ! Input:  [real(r8)  (:)   ]  leaf longevity (yrs)                              
-         froot_long                          =>    veg_vp%froot_long                                 , & ! Input:  [real(r8)  (:)   ]  fine root longevity (yrs)                  
-         woody                               =>    veg_vp%woody                                      , & ! Input:  [real(r8)  (:)   ]  binary flag for woody lifeform (1=woody, 0=not woody)
-         stress_decid                        =>    veg_vp%stress_decid                               , & ! Input:  [real(r8)  (:)   ]  binary flag for stress-deciduous leaf habit (0 or 1)
+         leaf_long                           =>    veg_vp%leaf_long                                      , & ! Input:  [real(r8)  (:)   ]  leaf longevity (yrs)
+         froot_long                          =>    veg_vp%froot_long                                     , & ! Input:  [real(r8)  (:)   ]  fine root longevity (yrs)
+         woody                               =>    veg_vp%woody                                          , & ! Input:  [real(r8)  (:)   ]  binary flag for woody lifeform (1=woody, 0=not woody)
+         stress_decid                        =>    veg_vp%stress_decid                                   , & ! Input:  [real(r8)  (:)   ]  binary flag for stress-deciduous leaf habit (0 or 1)
+         storage_mobility                    =>    veg_vp%storage_mobility                               , & ! Input:  [real(r8)  (:)   ]  total storage pool mobility  (0 - 1.0)
          
          soilpsi                             =>    soilstate_vars%soilpsi_col                            , & ! Input:  [real(r8)  (:,:) ]  soil water potential in each soil layer (MPa)   
          
