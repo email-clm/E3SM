@@ -86,6 +86,8 @@ module clm_interface_pflotranMod
 
   logical, pointer, public :: mapped_gcount_skip(:)     ! dim: inactive grid mask in (1:bounds%endg-bounds%begg+1),
                                                         !      or inactive column in (1:bounds%endc-bounds%endc+1)
+  logical :: HEAD_BASED                                 ! Head-based Hydrology coupling (i.e. Pressure-head data-passing)
+
 #endif
   !
   character(len=CL), private:: pflotran_inputdir = ''
@@ -1064,21 +1066,34 @@ contains
 
     ! coupled module controls betweeen PFLOTRAN and CLM45
     if(pflotran_m%option%iflowmode/=NULL_MODE) then
-       pf_hmode = .true.
-       if (pflotran_m%option%use_isothermal) then
+      pf_hmode = .true.
+
+      if (pflotran_m%option%use_isothermal) then
          pf_tmode = .false.
       else
          pf_tmode = .true.
-         if (pflotran_m%option%use_th_freezing) pf_frzmode = .true.
       endif
-    else
-      pf_hmode = .false.
+
+      if (pflotran_m%option%use_th_freezing) then
+         pf_frzmode = .true.
+      else
+         pf_frzmode = .false.
+      endif
     endif
 
     if(pflotran_m%option%ntrandof.gt.0) then
       pf_cmode = .true.        ! initialized as '.false.' in clm initialization
     endif
 
+    ! Hydrology coupling consistency control:
+    !  Head-based coupling: data coupling is by pressure-head; otherwise is by mass.
+    !  (NOTE: this is critical for mass-balance checking)
+    HEAD_BASED = .true.
+    clm_pf_idata%head_based = HEAD_BASED
+
+
+
+    ! Initialize PFLOTRAN states
     !------------------------------------------------
     ! (7) Initialize PFLOTRAN states
     call pflotranModelStepperRunInit(pflotran_m)
@@ -1166,20 +1181,29 @@ contains
 
     ! (1)
     ! if PF T/H mode not available, have to pass those from CLM to global variable in PF to drive BGC/H
-    if (.not. isinitpf .and. (.not.pf_tmode .or. .not.pf_hmode)) then    ! always initialize from CLM to pF, if comment out this 'if'block
-       call get_clm_soil_th(clm_interface_data, .TRUE., .TRUE., bounds, filters, ifilter)
+    if (.not. isinitpf) then    ! always initialize from CLM to PF, if comment out this 'if'block
 
-       call pflotranModelUpdateTHfromCLM(pflotran_m, .FALSE., .FALSE.)     ! pass TH to global_auxvar
+       ! ice-len adjusted porostiy, if PF-ice mode off
+       if (.not.pf_frzmode) then
+           call get_clm_iceadj_porosity(clm_interface_data, bounds, filters, ifilter)
+           call pflotranModelResetSoilPorosityFromCLM(pflotran_m)
+       endif
+
+       ! note: first .F/T. - initpf_h; second .F/T. - initpf_t, but here always pass data to interface
+        call get_clm_soil_th(clm_interface_data, .TRUE., .TRUE., bounds, filters, ifilter)
+
+       ! then pass interface TH variables to global_auxvar, if H or TH not coupled
+       ! (first .F/T. - pf_hmode; second .F/T. - pf_tmode)
+       if (.not.pf_tmode .or. .not.pf_hmode) then
+          call pflotranModelUpdateTHfromCLM(pflotran_m, pf_hmode, pf_tmode)
+       endif
+
+       ! the following will directly pass soil water pressure head or T/P to PF's Richards-mode or TH mode (if it's on).
+       if (pf_hmode .or. pf_tmode) then
+          call pflotranModelSetInternalTHStatesfromCLM(pflotran_m, HEAD_BASED)
+       endif
 
     end if
-
-    ! ice-len adjusted porostiy, if PF-ice mode off
-    if (.not.pf_frzmode) then
-        call get_clm_iceadj_porosity(clm_interface_data, bounds, filters, ifilter)
-
-        call pflotranModelResetSoilPorosityFromCLM(pflotran_m)
-
-    endif
 
 #if 0
     ! (2) CLM thermal BC to PFLOTRAN-CLM interface
@@ -1412,7 +1436,7 @@ contains
          lonv       =>  ldomain%lonv   , & !  [real(r8) (:,:)]
 
          lelev      =>  ldomain%topo   , & !  [real(r8) (:)]
-         larea      =>  ldomain%area   , & !  [real(r8) (:)]
+         larea      =>  ldomain%area   , & !  [real(r8) (:)] in km2
          ! landunit
          ltype      =>  lun_pp%itype      , & !  [integer (:)]  landunit type index
          ! Assign local pointer to derived subtypes components (column-level)
@@ -1592,9 +1616,13 @@ contains
                   dysoil_clm_loc(cellcount) = abs(lats(1)+lats(2)-lats(3)-lats(4))/2.0_r8
 
                else
+
                   dxsoil_clm_loc(cellcount) = larea(g)/(re**2)  &       ! in degrees of great circle length
                                                * wtgcell_sum(colcount) * ldomain%frac(g)
+                  dxsoil_clm_loc(cellcount) = sqrt(dxsoil_clm_loc(cellcount))
                   dysoil_clm_loc(cellcount) = larea(g)/(re**2)
+                  dysoil_clm_loc(cellcount) = sqrt(dysoil_clm_loc(cellcount))
+
                endif
 
             else
@@ -1897,12 +1925,6 @@ contains
           if (j <= nlevgrnd) then
             cellcount = gcount*clm_pf_idata%nzclm_mapped + j     ! 1-based
 
-            ! CLM calculation of wet thermal-conductivity as following:
-            ! dksat = tkmg(c,j)*tkwat**(fl*watsat(c,j))*tkice**((1._r8-fl)*watsat(c,j))
-            ! where, fl is the liq. saturation/total saturation
-            ! so, if fl=0, it's the frozen-wet thermal-conductitivity
-            !     if fl=1, it's the liq.-wet thermal-conductivity, i.e. 'tksatu'
-
             tkwet_clm_loc(cellcount )  = &                      !(W/m/K)
                 tkwet_clm_loc(cellcount ) + tkwet(c,j)*wtgcount
             tkdry_clm_loc(cellcount )  = &
@@ -2022,15 +2044,15 @@ contains
 
     PetscScalar, pointer :: soilpress_clmp_loc(:)
     PetscScalar, pointer :: soilpsi_clmp_loc(:)
-    PetscScalar, pointer :: soillsat_clmp_loc(:)
-    PetscScalar, pointer :: soilisat_clmp_loc(:)
+    PetscScalar, pointer :: soillsat_clmp_loc(:), soilisat_clmp_loc(:)   ! 0 -1 of porosity
+    PetscScalar, pointer :: soilliq_clmp_loc(:), soilice_clmp_loc(:)     ! kg/m^3 bulk soil
     PetscScalar, pointer :: soilt_clmp_loc(:)  !
     PetscScalar, pointer :: t_scalar_clmp_loc(:)  !
     PetscScalar, pointer :: w_scalar_clmp_loc(:)  !
     PetscScalar, pointer :: o_scalar_clmp_loc(:)  !
     PetscErrorCode :: ierr
     integer :: j,nstep
-    real(r8):: sattmp, psitmp, itheta, sucmin_pa, psitmp0
+    real(r8):: mm2pa, sattmp, isattmp, psitmp, itheta, sucmin_pa
 
     character(len= 32) :: subname = 'get_clm_soil_th' ! subroutine name
 
@@ -2040,11 +2062,12 @@ contains
       cgridcell       => col_pp%gridcell               , & ! column's gridcell
       dz              => col_pp%dz                     , & ! layer thickness depth (m)
       !
-      sucsat          => clm_interface_data%sucsat_col    , & ! minimum soil suction (mm) (nlevgrnd)
-      bsw             => clm_interface_data%bsw_col       , & ! Clapp and Hornberger "b"
-      watsat          => clm_interface_data%watsat_col    , & ! volumetric soil water at saturation (porosity) (nlevgrnd)
-      watmin          => clm_interface_data%watmin_col    , & ! col minimum volumetric soil water (nlevsoi)
-      sucmin          => clm_interface_data%sucmin_col    , & ! col minimum allowable soil liquid suction pressure (mm) [Note: sucmin_col is a negative value, while sucsat_col is a positive quantity]
+      sucsat          => clm_interface_data%sucsat_col      , & ! minimum soil suction (mm) (nlevgrnd)
+      bsw             => clm_interface_data%bsw_col         , & ! Clapp and Hornberger "b"
+      watsat          => clm_interface_data%watsat_col      , & ! volumetric soil water at saturation (porosity) (nlevgrnd)
+      eff_porosity    => clm_interface_data%eff_porosity_col, & ! porosity - ice-vwc
+      watmin          => clm_interface_data%watmin_col      , & ! col minimum volumetric soil water (nlevsoi)
+      sucmin          => clm_interface_data%sucmin_col      , & ! col minimum allowable soil liquid suction pressure (mm) [Note: sucmin_col is a negative value, while sucsat_col is a positive quantity]
       !
       soilpsi         => clm_interface_data%th%soilpsi_col   ,  & ! soil water matric potential in each soil layer (MPa)
       h2osoi_liq      => clm_interface_data%th%h2osoi_liq_col,  & ! liquid water (kg/m2)
@@ -2067,6 +2090,10 @@ contains
     call VecGetArrayF90(clm_pf_idata%soillsat_clmp, soillsat_clmp_loc, ierr)
     call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
     call VecGetArrayF90(clm_pf_idata%soilisat_clmp, soilisat_clmp_loc, ierr)
+    call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
+    call VecGetArrayF90(clm_pf_idata%soilliq_clmp, soilliq_clmp_loc, ierr)
+    call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
+    call VecGetArrayF90(clm_pf_idata%soilice_clmp, soilice_clmp_loc, ierr)
     call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
     call VecGetArrayF90(clm_pf_idata%soilt_clmp, soilt_clmp_loc, ierr)
     call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
@@ -2101,40 +2128,45 @@ contains
              ! so that the following calculation can be done correctly
              itheta = h2osoi_ice(c,j) / (dz(c,j) * denice)
              itheta = min(itheta, watsat(c,j)-watmin(c,j))
-             soilisat_clmp_loc(cellcount) = itheta/watsat(c,j)
+             isattmp= itheta/watsat(c,j)
+             soilisat_clmp_loc(cellcount) = isattmp
+             soilice_clmp_loc(cellcount)  = h2osoi_ice(c,j) / dz(c,j)           ! kg/m^3
+
+             mm2pa = denh2o*SHR_CONST_G*1.e-3_r8                                ! pressure unit: mmH2O --> Pa
 
              if(.not.pf_frzmode) then
                 ! porosity will be ice-adjusted for PF, if PF freezing-mode is off,
-                ! so need to adjust 'psi' so that 'saturation' in PF is correct
-                sattmp = h2osoi_liq(c,j) / ((watsat(c,j)-itheta)*dz(c,j)*denh2o)
-                sattmp = min(max(0.01d0, sattmp/(watsat(c,j)-itheta)),1._r8)
-
-                ! soil matric potential re-done by Clapp-Hornburger method (this is the default used by CLM)
-                ! this value IS different from what CLM used (not ice-content adjusted)
-                ! So that in PF, if not ice-adjusted, the PSI is very small (negative) which implies possible water movement
-
-                ! sucsat > 0, sucmin < 0, sucsat & sucmin have units of mm
-                ! psitmp = psitmp0, as denh2o*1.e-3_r8 = 1.0
-                psitmp0 = sucsat(c,j) * (-SHR_CONST_G) * (sattmp**(-bsw(c,j)))  ! -Pa
-
-                psitmp = denh2o*(-SHR_CONST_G)*(sucsat(c,j)*1.e-3_r8)*(sattmp**(-bsw(c,j))) ! -Pa
-                sucmin_pa = denh2o*SHR_CONST_G*sucmin(c,j)*1.e-3_r8                         ! -Pa
-                psitmp = min(max(psitmp,sucmin_pa),0._r8) !Pa
-
+                ! so need to adjust 'psi' so that 'saturation' in PF is corrected
+                sattmp = h2osoi_liq(c,j) / (eff_porosity(c,j)*dz(c,j)*denh2o)
              else
                 sattmp = h2osoi_liq(c,j) / (watsat(c,j)*dz(c,j)*denh2o)
-                sattmp = min(max(0.01d0, sattmp/watsat(c,j)),1._r8)
+             endif !if(.not.pf_frzmode)
+             sattmp = min(max(0.0001d0, sattmp), 1._r8)
 
-                psitmp = soilpsi(c,j)*1.e6_r8  ! MPa -> Pa
-                if (shr_infnan_isnan(soilpsi(c,j)) .or. nstep<=0) then ! only for initialization, in which NOT assigned a value
-                    psitmp0 = sucsat(c,j) * (-SHR_CONST_G) * ((sattmp+itheta)**(-bsw(c,j)))  ! -Pa: included both ice and liq. water as CLM does
-                    psitmp = denh2o*(-SHR_CONST_G)*(sucsat(c,j)*1.e-3_r8) * ((sattmp+itheta)**(-bsw(c,j)))
-                    sucmin_pa = denh2o*SHR_CONST_G*sucmin(c,j)*1.e-3_r8
-                    psitmp = min(max(psitmp,sucmin_pa),0._r8)
-                endif
+             ! soil matric potential re-done by Clapp-Hornburger method (this is the default used by CLM)
+             ! this value may be different from what CLM used, for examples:
+             ! (1) if not ice-content adjusted, then in PF,
+             !     the PSI is very small (negative) which implies possible water movement
+             ! (2) 'soilpsi' primarily used in 'CLM-CN', if only in physical-mode for CLM, it actually didn't have a value
 
-             endif !if(.not.pf_frzmode) 
+             ! sucsat > 0, sucmin < 0, sucsat & sucmin have units of mm
+             if(.not.pf_frzmode) then
+                psitmp = (-sucsat(c,j)*mm2pa) * (sattmp**(-bsw(c,j)))        ! -Pa
+             else
+                ! in PFLOTRAN, soil matrical potential is for interface of gas-ice/liq (i.e. including ice sat)
+                psitmp = (-sucsat(c,j)*mm2pa) * ((sattmp+isattmp)**(-bsw(c,j)))           ! -Pa
+             endif
+             sucmin_pa = sucmin(c,j)*mm2pa                                   ! -mmH2O --> -Pa
+             psitmp = min(max(psitmp,sucmin_pa),0._r8)                       ! -Pa
+
+             if (shr_infnan_isnan(soilpsi(c,j)) .or. &
+                 (is_first_step() .or. is_first_restart_step())) then
+                ! when initialization, CLM did NOT assign a value to soilpsi
+                soilpsi(c,j) = psitmp *1.e-6_r8                              ! -Pa -> -MPa
+             endif
+
              soillsat_clmp_loc(cellcount)  = sattmp
+             soilliq_clmp_loc(cellcount)   = h2osoi_liq(c,j) / dz(c,j)           ! kg/m^3
 
              soilpsi_clmp_loc(cellcount)   = psitmp
              soilpress_clmp_loc(cellcount) = psitmp+clm_pf_idata%pressure_reference
@@ -2165,6 +2197,10 @@ contains
     call VecRestoreArrayF90(clm_pf_idata%soillsat_clmp, soillsat_clmp_loc, ierr)
     call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
     call VecRestoreArrayF90(clm_pf_idata%soilisat_clmp, soilisat_clmp_loc, ierr)
+    call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
+    call VecRestoreArrayF90(clm_pf_idata%soilliq_clmp, soilliq_clmp_loc, ierr)
+    call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
+    call VecRestoreArrayF90(clm_pf_idata%soilice_clmp, soilice_clmp_loc, ierr)
     call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
     call VecRestoreArrayF90(clm_pf_idata%soilt_clmp, soilt_clmp_loc, ierr)
     call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
@@ -2213,7 +2249,6 @@ contains
     real(r8) :: itheta
 
     PetscScalar, pointer :: adjporosity_clmp_loc(:)  !
-    PetscScalar, pointer :: soilisat_clmp_loc(:)  !
     PetscErrorCode :: ierr
 
     character(len= 32) :: subname = 'get_clm_iceadj_porosity' ! subroutine name
@@ -2225,6 +2260,8 @@ contains
     dz              => col_pp%dz                                 , & ! layer thickness depth (m)
     !
     watsat          => clm_interface_data%watsat_col          , & ! volumetric soil water at saturation (porosity) (nlevgrnd)
+    watmin          => clm_interface_data%watmin_col          , & ! col minimum volumetric soil water (nlevsoi)
+    eff_porosity    => clm_interface_data%eff_porosity_col    , & ! porosity - ice-vwc
     h2osoi_ice      => clm_interface_data%th%h2osoi_ice_col     & ! ice lens (kg/m2)
     )
 
@@ -2235,8 +2272,6 @@ contains
 
         ! re-calculate the effective porosity (CLM ice-len adjusted), which should be pass to pflotran
         call VecGetArrayF90(clm_pf_idata%effporosity_clmp, adjporosity_clmp_loc,  ierr)
-        call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
-        call VecGetArrayF90(clm_pf_idata%soilisat_clmp, soilisat_clmp_loc,  ierr)
         call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
 
         ! operating via 'filters'
@@ -2258,9 +2293,11 @@ contains
                cellcount = gcount*clm_pf_idata%nzclm_mapped + j    ! 1-based
 
                itheta = h2osoi_ice(c,j) / (dz(c,j) * denice)
-               itheta = min(itheta, 0.99_r8*watsat(c,j))
+               itheta = min(itheta, watsat(c,j)-watmin(c,j))
+
+               eff_porosity(c,j) = watsat(c,j) - itheta
                adjporosity_clmp_loc(cellcount ) = watsat(c,j) - itheta
-               soilisat_clmp_loc(cellcount ) = itheta/watsat(c,j)
+
              else
                call endrun(trim(subname) // ": ERROR: CLM-PF mapped soil layer number is greater than " // &
                  " 'clm_varpar%nlevgrnd'. Please check")
@@ -2271,8 +2308,6 @@ contains
         end do
 
         call VecRestoreArrayF90(clm_pf_idata%effporosity_clmp,  adjporosity_clmp_loc,  ierr)
-        call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
-        call VecRestoreArrayF90(clm_pf_idata%soilisat_clmp, soilisat_clmp_loc,  ierr)
         call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
 
     end if
@@ -2457,14 +2492,14 @@ contains
           qflwt_clmp_loc(cellcount ) = t_nearsurf(gcount+1) - tfrz
 
           if (j .eq. 1) then
-             qfluxw_top_clmp_loc(gcount+1)     = 0.0_r8
-             qfluxev_top_clmp_loc(gcount+1)    = 0.0_r8
-             press_top_clmp_loc(gcount+1)  = press_clms_loc(cellcount)   ! same as the first top layer
+             qfluxw_top_clmp_loc(gcount+1)  = 0.0_r8
+             qfluxev_top_clmp_loc(gcount+1) = 0.0_r8
+             press_top_clmp_loc(gcount+1)   = press_clms_loc(cellcount)   ! same as the first top layer
           end if
 
           if (j .eq. clm_pf_idata%nzclm_mapped) then
-             qfluxw_base_clmp_loc(gcount+1)    = 0.0_r8
-             press_base_clmp_loc(gcount+1) = press_clms_loc((gcount+1)*clm_pf_idata%nzclm_mapped)   ! same as the bottom layer
+             qfluxw_base_clmp_loc(gcount+1) = 0.0_r8
+             press_base_clmp_loc(gcount+1)  = press_clms_loc((gcount+1)*clm_pf_idata%nzclm_mapped)   ! same as the bottom layer
           end if
 
         else
@@ -3264,6 +3299,7 @@ contains
     use clm_varcon          , only : denh2o, denice
     use clm_varctl          , only : pf_frzmode
     use clm_varpar          , only : nlevgrnd
+    use shr_const_mod       , only : SHR_CONST_G
 
   ! !ARGUMENTS:
     implicit none
@@ -3277,9 +3313,10 @@ contains
   ! !LOCAL VARIABLES:
     integer  :: fc, c, j, g              ! indices
     integer  :: cellcount, gcount
+    real(r8) :: mm2pa, psitmp, sattmp, isattmp, sucmin_pa, porosity
 
-    PetscScalar, pointer :: sat_ice_clm_loc(:)
-    PetscScalar, pointer :: sat_clm_loc(:)
+    PetscScalar, pointer :: sat_liq_clm_loc(:), sat_ice_clm_loc(:)     ! 0 - 1 of porosity
+    PetscScalar, pointer :: soilliq_clm_loc(:), soilice_clm_loc(:)     ! kg/m^3
     PetscScalar, pointer :: effporo_clm_loc(:)
     PetscScalar, pointer :: soilpsi_clm_loc(:)
     PetscErrorCode :: ierr
@@ -3292,7 +3329,10 @@ contains
       cgridcell       => col_pp%gridcell               , & ! column's gridcell
       dz              => col_pp%dz                     , & ! layer thickness depth (m)
       !
+      sucsat          => clm_interface_data%sucsat_col       , & ! minimum soil suction (mm) (nlevgrnd)
+      bsw             => clm_interface_data%bsw_col          , & ! Clapp and Hornberger "b"
       watsat          => clm_interface_data%watsat_col       , & ! volumetric soil water at saturation (porosity) (nlevgrnd)
+      sucmin          => clm_interface_data%sucmin_col       , & ! restriction for min of soil potential (mm) (nlevgrnd)
       !
       soilpsi         => clm_interface_data%th%soilpsi_col   , & ! soil water matric potential in each soil layer (MPa)
       h2osoi_liq      => clm_interface_data%th%h2osoi_liq_col, & ! liquid water (kg/m2)
@@ -3300,7 +3340,9 @@ contains
       h2osoi_vol      => clm_interface_data%th%h2osoi_vol_col  & ! volumetric soil water (0<=h2osoi_vol<=watsat) [m3/m3]
      )
     !
-    call VecGetArrayReadF90(clm_pf_idata%soillsat_clms, sat_clm_loc, ierr)
+    call VecGetArrayReadF90(clm_pf_idata%soillsat_clms, sat_liq_clm_loc, ierr)
+    call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
+    call VecGetArrayReadF90(clm_pf_idata%soilliq_clms, soilliq_clm_loc, ierr)
     call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
     call VecGetArrayReadF90(clm_pf_idata%effporosity_clms, effporo_clm_loc, ierr)
     call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
@@ -3308,6 +3350,8 @@ contains
     call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
     if (pf_frzmode) then
        call VecGetArrayReadF90(clm_pf_idata%soilisat_clms, sat_ice_clm_loc, ierr)
+       call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
+       call VecGetArrayReadF90(clm_pf_idata%soilice_clms, soilice_clm_loc, ierr)
        call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
     endif
 
@@ -3330,37 +3374,60 @@ contains
         if (j<=clm_pf_idata%nzclm_mapped) then
           cellcount = gcount*clm_pf_idata%nzclm_mapped + j
 
-          h2osoi_liq(c,j) = sat_clm_loc(cellcount) * &
-                            effporo_clm_loc(cellcount) * dz(c,j) * denh2o    ! 'watsat_clm_loc' may be effective porosity
           if (pf_frzmode) then
              ! since 'effporo' may be expanding when freezing, and 'soilpsi' is actually what PF works on
-             ! it's better to use CLM's 'watsat'
-             h2osoi_liq(c,j) = sat_clm_loc(cellcount) * &
-                              !effporo_clm_loc(cellcount) * dz(c,j) * denh2o
-                              watsat(c,j) * dz(c,j) * denh2o
-             h2osoi_ice(c,j) = sat_ice_clm_loc(cellcount) * &
-                              !effporo_clm_loc(cellcount) * dz(c,j) * denice
-                              watsat(c,j) * dz(c,j) * denice
+             ! it's better to use CLM's 'watsat' for purpose of water-balance check
+             porosity = watsat(c,j)
+          else
+             porosity = effporo_clm_loc(cellcount)
+          endif
+
+          mm2pa = denh2o*SHR_CONST_G*1.e-3_r8                                ! pressure unit: mmH2O --> Pa
+          if (pf_frzmode) then
+             !isattmp = sat_ice_clm_loc(cellcount)
+             isattmp = soilice_clm_loc(cellcount)/(denice*watsat(c,j))
+          else
+             isattmp = h2osoi_ice(c,j)/(watsat(c,j)*dz(c,j)*denice)
+          endif
+#if 0
+          psitmp = soilpsi_clm_loc(cellcount)                                ! -Pa
+          if(psitmp<(-sucsat(c,j)*mm2pa)) then
+             sattmp = psitmp/(-sucsat(c,j)*mm2pa)                            ! sucsat in +mmH2O
+             sattmp = sattmp**(-1.0_r8/bsw(c,j))
+          else
+             sattmp = 1.0_r8
+          end if
+#else
+          !sattmp = sat_liq_clm_loc(cellcount)
+          sattmp = soilliq_clm_loc(cellcount)/(denh2o*porosity)
+          psitmp = (-sucsat(c,j)*mm2pa) * ((sattmp+isattmp)**(-bsw(c,j)))    ! -Pa
+          sucmin_pa = sucmin(c,j)*mm2pa                                      ! -mmH2O --> -Pa
+          psitmp = min(max(psitmp,sucmin_pa),0._r8)                          ! -Pa
+#endif
+
+          soilpsi(c,j)    = psitmp*1.e-6_r8                                  ! -Pa --> -MPa
+          h2osoi_liq(c,j) = sattmp * &
+                            porosity * dz(c,j) * denh2o                      ! 'porosity' may be effective porosity, if 'frzmode' off
+
+          ! (TODO) the following needs careful checking
+          if (pf_frzmode) then
+             h2osoi_ice(c,j) = isattmp * watsat(c,j) * dz(c,j) * denice
           end if
 
-          soilpsi(c,j) = soilpsi_clm_loc(cellcount)*1.e-6_r8         ! Pa --> MPa (negative)
-
+        ! just in case
         else
-          h2osoi_liq(c,j) = sat_clm_loc((gcount+1)*clm_pf_idata%nzclm_mapped) *      &
-                            effporo_clm_loc((gcount+1)*clm_pf_idata%nzclm_mapped) *  &
-                            dz(c,j) * denh2o    ! 'watsat_clm_loc' may be effective porosity
+
+          h2osoi_liq(c,j) = h2osoi_liq(c,clm_pf_idata%nzclm_mapped)/ &
+                            dz(c,clm_pf_idata%nzclm_mapped)*dz(c,j)
           if (pf_frzmode) then
-             h2osoi_liq(c,j) = sat_clm_loc((gcount+1)*clm_pf_idata%nzclm_mapped) * &
-                              !effporo_clm_loc((gcount+1)*clm_pf_idata%nzclm_mapped) * dz(c,j) * denh2o    ! 'watsat_clm_loc' may be effective porosity
-                              watsat(c,clm_pf_idata%nzclm_mapped) * dz(c,j) * denh2o
-             h2osoi_ice(c,j) = sat_ice_clm_loc((gcount+1)*clm_pf_idata%nzclm_mapped) * &
-                              !effporo_clm_loc((gcount+1)*clm_pf_idata%nzclm_mapped) * dz(c,j) * denice
-                              watsat(c,clm_pf_idata%nzclm_mapped) * dz(c,j) * denice
+             h2osoi_ice(c,j) = h2osoi_ice(c,clm_pf_idata%nzclm_mapped)/ &
+                            dz(c,clm_pf_idata%nzclm_mapped)*dz(c,j)
           end if
 
           soilpsi(c,j) = soilpsi(c,clm_pf_idata%nzclm_mapped)
         end if
 
+        !
         h2osoi_vol(c,j) = h2osoi_liq(c,j) / dz(c,j) / denh2o + &
                           h2osoi_ice(c,j) / dz(c,j) / denice
         h2osoi_vol(c,j) = min(h2osoi_vol(c,j), watsat(c,j))
@@ -3369,7 +3436,9 @@ contains
 
     enddo
 
-    call VecRestoreArrayReadF90(clm_pf_idata%soillsat_clms, sat_clm_loc, ierr)
+    call VecRestoreArrayReadF90(clm_pf_idata%soillsat_clms, sat_liq_clm_loc, ierr)
+    call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
+    call VecRestoreArrayReadF90(clm_pf_idata%soilliq_clms, soilliq_clm_loc, ierr)
     call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
     call VecRestoreArrayReadF90(clm_pf_idata%effporosity_clms, effporo_clm_loc, ierr)
     call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
@@ -3377,6 +3446,8 @@ contains
     call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
     if (pf_frzmode) then
        call VecRestoreArrayReadF90(clm_pf_idata%soilisat_clms, sat_ice_clm_loc, ierr)
+       call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
+       call VecRestoreArrayReadF90(clm_pf_idata%soilice_clms, soilice_clm_loc, ierr)
        call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
     endif
 
