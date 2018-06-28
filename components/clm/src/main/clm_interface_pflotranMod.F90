@@ -1205,7 +1205,7 @@ contains
 
     end if
 
-#if 0
+!#if 0
     ! (2) CLM thermal BC to PFLOTRAN-CLM interface
     if (pf_tmode) then
         call get_clm_bceflx(clm_interface_data, bounds, filters, ifilter)
@@ -1220,7 +1220,7 @@ contains
         call pflotranModelUpdateHSourceSink( pflotran_m )   ! H SrcSink
         call pflotranModelSetSoilHbcsFromCLM( pflotran_m )  ! H bc
     end if
-#endif
+!#endif
 
     ! (4)
     if (pf_cmode) then
@@ -1262,7 +1262,7 @@ contains
     call mpi_barrier(mpicom, ierr)
 
     ! (6) update CLM variables from PFLOTRAN
-#if 0
+!#if 0
     if (pf_hmode) then
         call pflotranModelGetSaturationFromPF( pflotran_m )   ! hydrological states
         call update_soil_moisture_pf2clm(clm_interface_data, bounds, filters, ifilter)
@@ -1278,7 +1278,7 @@ contains
         call pflotranModelGetTemperatureFromPF( pflotran_m )  ! thermal states
         call update_soil_temperature_pf2clm(clm_interface_data, bounds, filters, ifilter)
     endif
-#endif
+!#endif
 
     if (pf_cmode) then
         call pflotranModelGetBgcVariablesFromPF( pflotran_m)      ! bgc variables
@@ -2420,7 +2420,7 @@ contains
     nstep = get_nstep()
     dtime = get_step_size()
 
-#if 0
+!#if 0
     ! (1) pass the clm_qflx to the vecs
     ! NOTE the following unit conversions:
     ! qflx_soil_top and qflx_tran_veg are in [mm/sec] from CLM;
@@ -2694,7 +2694,7 @@ contains
     call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
     call VecRestoreArrayF90(clm_pf_idata%press_maxponding_clmp, press_maxponding_clmp_loc, ierr)
     call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
-#endif
+!#endif
 
   end associate
   end subroutine get_clm_bcwflx
@@ -2779,7 +2779,7 @@ contains
     nstep = get_nstep()
     dtime = get_step_size()
 
-#if 0
+!#if 0
     ! (1) pass the clm_gflux/gtemp to the vec
 
     call VecGetArrayF90(clm_pf_idata%eflux_subsurf_clmp, geflx_subsurf_clmp_loc, ierr)
@@ -2897,7 +2897,7 @@ contains
     call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
     call VecRestoreArrayF90(clm_pf_idata%area_top_face_clms, area_clms_loc, ierr)
     call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
-#endif
+!#endif
 
   end associate
   end subroutine get_clm_bceflx
@@ -3462,8 +3462,6 @@ contains
          ! if the most bottom layer is saturated, it's assumed 'zwt_perched' is also 'zwt'
          if(h2osoi_vol(c,nlevgrnd)/watsat(c,nlevgrnd) >= sat_crit) then
             zwt(c) = zwt_perched(c)
-         else
-            zwt(c) = -9999.9_r8
          endif
       endif
 
@@ -3654,13 +3652,14 @@ contains
     qflx_surf         =>    clm_interface_data%th%qflx_surf_col         , & ! [real(r8) (:)] surface runoff (mm H2O /s)
     qflx_infl         =>    clm_interface_data%th%qflx_infl_col         , & ! [real(r8) (:)] soil infiltration (mm H2O /s)
     qflx_drain        =>    clm_interface_data%th%qflx_drain_col        , & ! [real(r8) (:,:)]  sub-surface runoff (drainage) (mm H2O /s)
-    qflx_drain_vr     =>    clm_interface_data%th%qflx_drain_vr_col       & ! [real(r8) (:)]  vertically-resolved sub-surface runoff (drainage) (mm H2O /s)
+    qflx_drain_vr     =>    clm_interface_data%th%qflx_drain_vr_col     , & ! [real(r8) (:,:)]  vertically-resolved sub-surface runoff (drainage) (mm H2O /s)
+    qcharge           =>    clm_interface_data%th%qcharge_col             & ! [real(r8) (:)]  aquifer charge rate (mm H2O /s)
     )
 
     dtime = get_step_size()
     nstep = get_nstep()
 
-#if 0
+!#if 0
     ! from PF==>CLM
     call VecGetArrayReadF90(clm_pf_idata%area_top_face_clms, area_clm_loc, ierr)
     call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
@@ -3706,6 +3705,8 @@ contains
       qflx_drain(c) = -qflux_subbase_clm_loc(gcount+1)  &
                        /dtime/(area*denh2o*1.e-3)     ! kgH2O/time-step ==> mmH2O/sec (+ drainage, - upward-in)
 
+      !
+      qcharge(c) = 0._r8 ! temporarily set it to zero
     end do
 
 
@@ -3717,7 +3718,7 @@ contains
     call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
     call VecRestoreArrayReadF90(clm_pf_idata%qflux_subbase_clms,qflux_subbase_clm_loc,ierr)
     call clm_pf_checkerr(ierr, subname, __FILE__, __LINE__)
-#endif
+!#endif
 
     end associate
   end subroutine update_bcflow_pf2clm

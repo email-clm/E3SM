@@ -135,7 +135,7 @@ contains
            bounds, num_soilc, filter_soilc,                       &
            num_soilp, filter_soilp,                               &
            atm2lnd_vars, soilstate_vars,                          &
-           waterstate_vars, waterflux_vars,                       &
+           waterstate_vars, waterflux_vars, soilhydrology_vars,   &
            temperature_vars, energyflux_vars,                     &
            cnstate_vars, carbonflux_vars, carbonstate_vars,       &
            nitrogenflux_vars, nitrogenstate_vars,                 &
@@ -156,6 +156,7 @@ contains
 
     type(waterstate_type)       , intent(in)    :: waterstate_vars
     type(waterflux_type)        , intent(in)    :: waterflux_vars
+    type(soilhydrology_type)    , intent(in)    :: soilhydrology_vars
     type(temperature_type)      , intent(in)    :: temperature_vars
     type(energyflux_type)       , intent(in)    :: energyflux_vars
 
@@ -190,7 +191,8 @@ contains
     call get_clm_soil_th_state(clm_idata_th,                &
                    bounds, num_soilc, filter_soilc,         &
                    atm2lnd_vars, soilstate_vars,            &
-                   waterstate_vars, temperature_vars)
+                   waterstate_vars, temperature_vars,       &
+                   soilhydrology_vars)
 
     call get_clm_soil_th_flux(clm_idata_th,                 &
                        bounds, num_soilc, filter_soilc,     &
@@ -345,7 +347,8 @@ contains
   subroutine get_clm_soil_th_state(clm_idata_th,            &
                        bounds, num_soilc, filter_soilc,     &
                        atm2lnd_vars, soilstate_vars,        &
-                       waterstate_vars, temperature_vars)
+                       waterstate_vars, temperature_vars,   &
+                       soilhydrology_vars)
   !
   ! !DESCRIPTION:
   !  get soil temperature/saturation from CLM to soil BGC module
@@ -365,6 +368,7 @@ contains
     type(soilstate_type)     , intent(in) :: soilstate_vars
     type(waterstate_type)    , intent(in) :: waterstate_vars
     type(temperature_type)   , intent(in) :: temperature_vars
+    type(soilhydrology_type) , intent(in) :: soilhydrology_vars
 
     type(clm_interface_th_datatype)       , intent(inout) :: clm_idata_th
 
@@ -381,7 +385,10 @@ contains
       h2osoi_vol            => waterstate_vars%h2osoi_vol_col           , & ! [real(r8) (:,:)] volumetric soil water (0<=h2osoi_vol<=watsat) [m3/m3]  (nlevgrnd)
       h2osoi_liq            => waterstate_vars%h2osoi_liq_col           , & ! [real(r8) (:,:)] liquid water (kg/m2) (-nlevsno+1:nlevgrnd)
       h2osoi_ice            => waterstate_vars%h2osoi_ice_col           , & ! [real(r8) (:,:)] ice lens (kg/m2) (-nlevsno+1:nlevgrnd)
-      h2osfc                => waterstate_vars%h2osfc_col               , & ! [real(r8) (:)] surface water (mmH2O)
+      h2osfc                => waterstate_vars%h2osfc_col               , & ! [real(r8) (:)]  surface water (mmH2O)
+      zwt                   => soilhydrology_vars%zwt_col               , & ! [real(r8) (:)]  water table depth (m)
+      zwt_perched           => soilhydrology_vars%zwt_perched_col       , & ! [real(r8) (:)]  perched water table depth (m)
+      frost_table           => soilhydrology_vars%frost_table_col       , & ! [real(r8) (:)]  frost table depth (m)
       !
       t_soisno              => temperature_vars%t_soisno_col            , & ! [real(r8) (:,:)] snow-soil temperature (Kelvin) (-nlevsno+1:nlevgrnd)
       t_grnd                => temperature_vars%t_grnd_col              , & ! [real(r8) (:)] ground (snow/soil1/surfwater-mixed) temperature (Kelvin)
@@ -417,6 +424,10 @@ contains
             clm_idata_th%h2osoi_ice_col(c,j)         = h2osoi_ice(c,j)
             clm_idata_th%t_soisno_col(c,j)           = t_soisno(c,j)
         end do
+
+        clm_idata_th%zwt_col(c)         = zwt(c)
+        clm_idata_th%zwt_perched_col(c) = zwt_perched(c)
+        clm_idata_th%frost_table_col(c) = frost_table(c)
 
     end do
 
@@ -765,7 +776,8 @@ contains
 !--------------------------------------------------------------------------------------
   subroutine update_soil_moisture(clm_idata_th,     &
            bounds, num_soilc, filter_soilc,         &
-           soilstate_vars, waterstate_vars, waterflux_vars, soilhydrology_vars)
+           soilstate_vars, waterstate_vars,         &
+           waterflux_vars, soilhydrology_vars)
 
   !
   ! !DESCRIPTION:

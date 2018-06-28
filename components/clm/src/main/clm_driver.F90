@@ -799,7 +799,7 @@ contains
                            filter(nc)%num_soilc, filter(nc)%soilc,                      &
                            filter(nc)%num_soilp, filter(nc)%soilp,                      &
                            atm2lnd_vars, soilstate_vars,                                &
-                           waterstate_vars, waterflux_vars,                             &
+                           waterstate_vars, waterflux_vars, soilhydrology_vars,         &
                            temperature_vars, energyflux_vars,                           &
                            cnstate_vars, carbonflux_vars, carbonstate_vars,             &
                            nitrogenflux_vars, nitrogenstate_vars,                       &
