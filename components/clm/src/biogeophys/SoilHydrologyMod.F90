@@ -315,9 +315,9 @@ contains
      !-----------------------------------------------------------------------
 
      associate(                                                                & 
-          snl                  =>    col_pp%snl                                 , & ! Input:  [integer  (:)   ]  minus number of snow layers                        
-          dz                   =>    col_pp%dz                                  , & ! Input:  [real(r8) (:,:) ]  layer depth (m)                                 
-         nlev2bed         =>    col_pp%nlevbed                                  , & ! Input:  [integer  (:)   ]  number of layers to bedrock                     
+          snl                  =>    col_pp%snl                              , & ! Input:  [integer  (:)   ]  minus number of snow layers
+          dz                   =>    col_pp%dz                               , & ! Input:  [real(r8) (:,:) ]  layer depth (m)
+          nlev2bed             =>    col_pp%nlevbed                          , & ! Input:  [integer  (:)   ]  number of layers to bedrock
 
           t_soisno             =>    temperature_vars%t_soisno_col           , & ! Input:  [real(r8) (:,:) ]  soil temperature (Kelvin)                       
 

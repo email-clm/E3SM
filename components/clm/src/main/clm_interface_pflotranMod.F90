@@ -3314,6 +3314,8 @@ contains
     integer  :: fc, c, j, g              ! indices
     integer  :: cellcount, gcount
     real(r8) :: mm2pa, psitmp, sattmp, isattmp, sucmin_pa, porosity
+    integer  :: j_perch
+    real(r8) :: sat_crit, s1, s2, m,b
 
     PetscScalar, pointer :: sat_liq_clm_loc(:), sat_ice_clm_loc(:)     ! 0 - 1 of porosity
     PetscScalar, pointer :: soilliq_clm_loc(:), soilice_clm_loc(:)     ! kg/m^3
@@ -3328,6 +3330,7 @@ contains
     associate ( &
       cgridcell       => col_pp%gridcell               , & ! column's gridcell
       dz              => col_pp%dz                     , & ! layer thickness depth (m)
+      z               => col_pp%z                      , & ! layer depth (m)
       !
       sucsat          => clm_interface_data%sucsat_col       , & ! minimum soil suction (mm) (nlevgrnd)
       bsw             => clm_interface_data%bsw_col          , & ! Clapp and Hornberger "b"
@@ -3337,7 +3340,10 @@ contains
       soilpsi         => clm_interface_data%th%soilpsi_col   , & ! soil water matric potential in each soil layer (MPa)
       h2osoi_liq      => clm_interface_data%th%h2osoi_liq_col, & ! liquid water (kg/m2)
       h2osoi_ice      => clm_interface_data%th%h2osoi_ice_col, & ! ice lens (kg/m2)
-      h2osoi_vol      => clm_interface_data%th%h2osoi_vol_col  & ! volumetric soil water (0<=h2osoi_vol<=watsat) [m3/m3]
+      h2osoi_vol      => clm_interface_data%th%h2osoi_vol_col, & ! volumetric soil water (0<=h2osoi_vol<=watsat) [m3/m3]
+      zwt             => clm_interface_data%th%zwt_col       , & ! water table depth (m)
+      zwt_perched     => clm_interface_data%th%zwt_perched_col, & ! perched water table depth (m)
+      frost_table     => clm_interface_data%th%frost_table_col  & ! [Input]frost table depth (m)
      )
     !
     call VecGetArrayReadF90(clm_pf_idata%soillsat_clms, sat_liq_clm_loc, ierr)
@@ -3433,6 +3439,33 @@ contains
         h2osoi_vol(c,j) = min(h2osoi_vol(c,j), watsat(c,j))
 
       enddo
+
+      ! water-table depths
+      ! NOTE: pflotran doesn't calculate water tables (everything is water saturation/pressure)
+      sat_crit=0.99_r8
+      j_perch=-9999
+      do j=nlevgrnd,1,-1
+        if (h2osoi_vol(c,j)/watsat(c,j) <= sat_crit) then
+           j_perch=j
+           exit
+        endif
+      enddo
+      ! if perched water table exists
+      if (j_perch<=nlevgrnd .and. j_perch>0) then
+        ! interpolate between kjperch and j_perch+1 to find perched water table height
+         s1 = h2osoi_vol(c,j_perch)/watsat(c,j_perch)
+         s2 = h2osoi_vol(c,j_perch+1)/watsat(c,j_perch+1)
+         m=(z(c,j_perch+1)-z(c,j_perch))/(s2-s1)
+         b=z(c,j_perch+1)-m*s2
+         zwt_perched(c)=max(0._r8,m*sat_crit+b)
+
+         ! if the most bottom layer is saturated, it's assumed 'zwt_perched' is also 'zwt'
+         if(h2osoi_vol(c,nlevgrnd)/watsat(c,nlevgrnd) >= sat_crit) then
+            zwt(c) = zwt_perched(c)
+         else
+            zwt(c) = -9999.9_r8
+         endif
+      endif
 
     enddo
 

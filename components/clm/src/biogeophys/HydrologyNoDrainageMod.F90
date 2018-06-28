@@ -238,14 +238,11 @@ contains
 
       !------------------------------------------------------------------------------------
       if (use_pflotran .and. pf_hmode) then
-
+        ! only call original 'SoilWater' module for non-soil-hydrology column
         call SoilWater(bounds, num_hydrononsoic, filter_hydrononsoic, &
             num_urbanc, filter_urbanc, &
             soilhydrology_vars, soilstate_vars, waterflux_vars, waterstate_vars, temperature_vars, &
             soil_water_retention_curve)
-
-        ! let subroutine STOP here, run PFLOTRAN, and then RESUME the rest
-        return
 
       else
       !------------------------------------------------------------------------------------
@@ -274,8 +271,22 @@ contains
               soilhydrology_vars, waterstate_vars)
       end if
 
-      call WaterTable(bounds, num_hydrologyc, filter_hydrologyc, num_urbanc, filter_urbanc, &
-           soilhydrology_vars, soilstate_vars, temperature_vars, waterstate_vars, waterflux_vars) 
+      !------------------------------------------------------------------------------------
+      if (use_pflotran .and. pf_hmode) then
+        ! only call original 'WaterTable' module for non-soil-hydrology column
+        call WaterTable(bounds, num_hydrononsoic, filter_hydrononsoic, num_urbanc, filter_urbanc, &
+             soilhydrology_vars, soilstate_vars, temperature_vars, waterstate_vars, waterflux_vars)
+
+        ! let subroutine STOP here, run PFLOTRAN, and then RESUME the rest
+        return
+
+      else
+      !------------------------------------------------------------------------------------
+        call WaterTable(bounds, num_hydrologyc, filter_hydrologyc, num_urbanc, filter_urbanc, &
+             soilhydrology_vars, soilstate_vars, temperature_vars, waterstate_vars, waterflux_vars)
+      !------------------------------------------------------------------------------------
+      end if
+      !------------------------------------------------------------------------------------
 
 
       if (use_betr) then
@@ -684,15 +695,6 @@ contains
       ! Determine step size
 
       dtime = get_step_size()
-
-      if (use_vichydro) then
-         ! mapping soilmoist from CLM to VIC layers for runoff calculations
-         call CLMVICMap(bounds, num_hydrologyc, filter_hydrologyc, &
-              soilhydrology_vars, waterstate_vars)
-      end if
-
-      call WaterTable(bounds, num_hydrologyc, filter_hydrologyc, num_urbanc, filter_urbanc, &
-           soilhydrology_vars, soilstate_vars, temperature_vars, waterstate_vars, waterflux_vars)
 
       ! Natural compaction and metamorphosis.
       call SnowCompaction(bounds, num_snowc, filter_snowc, &
