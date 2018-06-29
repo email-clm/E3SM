@@ -877,7 +877,13 @@ contains
 
         ! add amount of ET adjusted by PFLOTRAN into 'qflx_surf' so that counted correctly in balance-checking
         ! NOTE: this is a work-around, especially when surface module not coupled with pflotran.
-        qflx_surf(c) = qflx_surf(c) - clm_idata_th%qflx_et_reduced_col(c)
+        !       (TODO) It's better to reduce individual ET
+        if(abs(clm_idata_th%qflx_et_reduced_col(c))>0._r8) then
+
+print *, 'ET-reduced?', qflx_surf(c), clm_idata_th%qflx_et_reduced_col(c)
+          qflx_surf(c) = qflx_surf(c) - clm_idata_th%qflx_et_reduced_col(c)
+
+        endif
 
         !summary of all water loss to currents
         qflx_runoff(c) = qflx_drain(c) + qflx_surf(c)  + qflx_h2osfc_surf(c) + qflx_qrgwl(c) + qflx_drain_perched(c)
