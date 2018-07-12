@@ -41,7 +41,8 @@ contains
        num_urbanc, filter_urbanc, &
        num_snowc, filter_snowc, &
        num_nosnowc, filter_nosnowc, &
-       atm2lnd_vars, soilstate_vars, energyflux_vars, temperature_vars, &
+       atm2lnd_vars, soilstate_vars, &
+       energyflux_vars, temperature_vars, &
        waterflux_vars, waterstate_vars, &
        soilhydrology_vars, aerosol_vars, &
        soil_water_retention_curve, ep_betr, &
@@ -278,6 +279,9 @@ contains
              soilhydrology_vars, soilstate_vars, temperature_vars, waterstate_vars, waterflux_vars)
 
         ! let subroutine STOP here, run PFLOTRAN, and then RESUME the rest
+
+print *,'====================================================================='
+
         return
 
       else
@@ -361,6 +365,23 @@ contains
       do c = bounds%begc,bounds%endc
          snowdp(c) = snow_depth(c) * frac_sno_eff(c)
       end do
+
+#if 0
+      !------------------------------------------------------------------------------------
+      if (use_pflotran .and. pf_hmode) then
+        ! only call original 'WaterTable' module for non-soil-hydrology column
+        call WaterTable(bounds, num_hydrononsoic, filter_hydrononsoic, num_urbanc, filter_urbanc, &
+             soilhydrology_vars, soilstate_vars, temperature_vars, waterstate_vars, waterflux_vars)
+
+        ! let subroutine STOP here, run PFLOTRAN, and then RESUME the rest
+
+print *,'====================================================================='
+
+        return
+      endif
+      !------------------------------------------------------------------------------------
+#endif
+
 
       ! Determine ground temperature, ending water balance and volumetric soil water
       ! Calculate soil temperature and total water (liq+ice) in top 10cm of soil

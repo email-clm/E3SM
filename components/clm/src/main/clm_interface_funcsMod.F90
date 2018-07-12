@@ -486,7 +486,7 @@ contains
     ! a few notes:
     !   - 'qflx_evap_soil' appears for total soil surface, esp. bare soil; 'qflx_ev_soil/snow/h2osfc' are actually applied for in soil water modules
     !   - 'qflx_ev_snow' vs. 'qflx_sub_snow': the former is for total evap from both solid/liq., the latter is from solid snow pack (normally shall be same)
-    !                        there is another variable 'qlfx_evap_grnd', which are those from liq. water when snow
+    !                        there is another variable 'qlfx_evap_grnd', which are those from liq. water when snow exists
     !--------------------------------------------------------------------------------------
 !
     do fc = 1,num_soilc
@@ -819,6 +819,7 @@ contains
          qflx_infl              => waterflux_vars%qflx_infl_col               , & ! Output: [real(r8) (:)   ]  infiltration (mm H2O /s)
          qflx_qrgwl             => waterflux_vars%qflx_qrgwl_col              , & ! Output: [real(r8) (:)   ]  qflx_surf at glaciers, wetlands, lakes
          qflx_runoff            => waterflux_vars%qflx_runoff_col             , & ! Output: [real(r8) (:)   ]  total water losses to currents from column (qflx_drain+qflx_surf+qflx_qrgwl) (mm H2O /s)
+         qflx_evap_tot          => waterflux_vars%qflx_evap_tot_col           , & ! In/Output: [real(r8) (:)] ! col soil surface evaporation (mm H2O/s) (+ = to atm) (mmH2O/s, adjusted if any)
          !
          zwt                    => soilhydrology_vars%zwt_col                 , & ! Output: [real(r8) (:)   ]  water table depth (m)
          zwt_perched            => soilhydrology_vars%zwt_perched_col         , & ! Output: [real(r8) (:)   ]  perched water table depth (m)
@@ -880,8 +881,10 @@ contains
         !       (TODO) It's better to reduce individual ET
         if(abs(clm_idata_th%qflx_et_reduced_col(c))>0._r8) then
 
-print *, 'ET-reduced?', qflx_surf(c), clm_idata_th%qflx_et_reduced_col(c)
-          qflx_surf(c) = qflx_surf(c) - clm_idata_th%qflx_et_reduced_col(c)
+print *, 'ET-reduced?', qflx_evap_tot(c)*1800._r8, &
+(qflx_evap_tot(c)-clm_idata_th%qflx_et_reduced_col(c))*1800._r8
+print *, ''
+          qflx_evap_tot(c)    = qflx_evap_tot(c) - clm_idata_th%qflx_et_reduced_col(c)
 
         endif
 

@@ -985,28 +985,29 @@ contains
 
        call t_startf('hydro2 drainage')
 
-       if (use_clm_interface .and. (use_pflotran .and. pf_hmode)) then
+       !if (use_clm_interface .and. (use_pflotran .and. pf_hmode)) then
          ! pflotran only works on 'soilc' (already done above).
          ! here for non-soil hydrology columns
-         call HydrologyDrainage(bounds_clump,                     &
-            filter(nc)%num_nolakec, filter(nc)%nolakec,           &
-            filter(nc)%num_hydrononsoic, filter(nc)%hydrononsoic, &
-            filter(nc)%num_urbanc, filter(nc)%urbanc,             &
-            filter(nc)%num_do_smb_c, filter(nc)%do_smb_c,         &
-            atm2lnd_vars, glc2lnd_vars, temperature_vars,         &
-            soilhydrology_vars, soilstate_vars, waterstate_vars, waterflux_vars,ep_betr)
+       !  call HydrologyDrainage(bounds_clump,                     &
+       !     filter(nc)%num_nolakec, filter(nc)%nolakec,           &
+       !     filter(nc)%num_hydrononsoic, filter(nc)%hydrononsoic, &
+       !     filter(nc)%num_urbanc, filter(nc)%urbanc,             &
+       !     filter(nc)%num_do_smb_c, filter(nc)%do_smb_c,         &
+       !     atm2lnd_vars, glc2lnd_vars, temperature_vars,         &
+       !     soilhydrology_vars, soilstate_vars, waterstate_vars, waterflux_vars,ep_betr)
 
-       else
+       !else
 
          call HydrologyDrainage(bounds_clump,                 &
             filter(nc)%num_nolakec, filter(nc)%nolakec,       &
             filter(nc)%num_hydrologyc, filter(nc)%hydrologyc, &
+            filter(nc)%num_hydrononsoic, filter(nc)%hydrononsoic, &
             filter(nc)%num_urbanc, filter(nc)%urbanc,         &                 
             filter(nc)%num_do_smb_c, filter(nc)%do_smb_c,     &                
             atm2lnd_vars, glc2lnd_vars, temperature_vars,     &
             soilhydrology_vars, soilstate_vars, waterstate_vars, waterflux_vars,ep_betr)
 
-       end if
+       !end if
 
        call t_stopf('hydro2 drainage')     
 
@@ -1365,6 +1366,9 @@ contains
        call clm_pf_finalize()
     end if
 
+print *,''
+print *,'-------------------------------------------------------------------'
+
   end subroutine clm_drv
 
   !-----------------------------------------------------------------------
@@ -1556,6 +1560,8 @@ contains
     call p2c (bounds, num_nolakec, filter_nolakec, &
          waterflux_vars%qflx_evap_soi_patch(bounds%begp:bounds%endp), &
          waterflux_vars%qflx_evap_soi_col(bounds%begc:bounds%endc))
+
+print *, 'evap_soi: ',waterflux_vars%qflx_evap_soi_col(bounds%begc:bounds%endc)*1800._r8
 
     call p2c (bounds, num_nolakec, filter_nolakec, &
          waterflux_vars%qflx_evap_tot_patch(bounds%begp:bounds%endp), &

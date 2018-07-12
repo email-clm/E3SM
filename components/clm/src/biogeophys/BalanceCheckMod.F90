@@ -89,16 +89,16 @@ contains
             h2ocan_col(bounds%begc:bounds%endc))
       
       if (use_var_soil_thick) then
-	 do f = 1, num_hydrologyc
+	     do f = 1, num_hydrologyc
             c = filter_hydrologyc(f)
       	    wa(c) = 0._r8                ! Made 0 for variable soil thickness
-	 end do
+	     end do
       else
-	 do f = 1, num_hydrologyc
+	     do f = 1, num_hydrologyc
             c = filter_hydrologyc(f)
             if (zwt(c) <= zi(c,nlevsoi)) then
                wa(c) = 5000._r8
-	    end if
+	        end if
          end do
       end if
       
@@ -110,6 +110,8 @@ contains
          else
             begwb(c) = h2ocan_col(c) + h2osno(c) + h2osfc(c) + wa(c)
          end if
+
+print *, 'surf water - ', c, h2ocan_col(c), h2osno(c), h2osfc(c)
          
       end do
       do j = 1, nlevgrnd
@@ -132,7 +134,11 @@ contains
       ! ---------------------------------------------------------------------------------
       do f = 1, num_nolakec
          c = filter_nolakec(f)
+
+print *, 'soil water - ', c, begwb(c)-h2ocan_col(c)-h2osno(c)-h2osfc(c)-wa(c)
+
          begwb(c) = begwb(c) + total_plant_stored_h2o(c)
+
       end do
 
       do f = 1, num_lakec
@@ -321,6 +327,10 @@ contains
                   - qflx_lateral(c) ) * dtime
              dwb(c) = (endwb(c)-begwb(c))/dtime
 
+print *, 'wb-change:', endwb(c)-begwb(c)
+print *,'surf-fluxes:', c, qflx_evap_tot(c), qflx_surf(c), qflx_h2osfc_surf(c), &
+qflx_qrgwl(c),qflx_drain(c),qflx_drain_perched(c),qflx_snwcp_ice(c), &
+qflx_lateral(c)
           else
 
              errh2o(c) = 0.0_r8
@@ -351,7 +361,7 @@ contains
 
        found = .false.
        do c = bounds%begc, bounds%endc
-          if (abs(errh2o(c)) > 1.e-7_r8) then
+          if (abs(errh2o(c)) > 1.e-6_r8) then
              found = .true.
              indexc = c
           end if
@@ -392,26 +402,26 @@ contains
              write(iulog,*)'clm model is stopping - error is greater than 1e-4 (mm)'
              write(iulog,*)'nstep                      = ',nstep
              write(iulog,*)'errh2o                     = ',errh2o(indexc)
-             write(iulog,*)'forc_rain                  = ',forc_rain_col(indexc)
-             write(iulog,*)'forc_snow                  = ',forc_snow_col(indexc)
+             write(iulog,*)'forc_rain                  = ',forc_rain_col(indexc)*dtime
+             write(iulog,*)'forc_snow                  = ',forc_snow_col(indexc)*dtime
              write(iulog,*)'endwb                      = ',endwb(indexc)
              write(iulog,*)'begwb                      = ',begwb(indexc)
-             write(iulog,*)'qflx_evap_tot              = ',qflx_evap_tot(indexc)
-             write(iulog,*)'qflx_irrig                 = ',qflx_irrig(indexc)
-             write(iulog,*)'qflx_surf                  = ',qflx_surf(indexc)
-             write(iulog,*)'qflx_h2osfc_surf           = ',qflx_h2osfc_surf(indexc)
-             write(iulog,*)'qflx_qrgwl                 = ',qflx_qrgwl(indexc)
-             write(iulog,*)'qflx_drain                 = ',qflx_drain(indexc)
-             write(iulog,*)'qflx_drain_perched         = ',qflx_drain_perched(indexc)
-             write(iulog,*)'qflx_flood                 = ',qflx_floodc(indexc)
-             write(iulog,*)'qflx_snwcp_ice             = ',qflx_snwcp_ice(indexc)
-             write(iulog,*)'qflx_glcice_melt           = ',qflx_glcice_melt(indexc)
-             write(iulog,*)'qflx_glcice_frz            = ',qflx_glcice_frz(indexc) 
-             write(iulog,*)'qflx_lateral               = ',qflx_lateral(indexc)
+             write(iulog,*)'qflx_evap_tot              = ',qflx_evap_tot(indexc)*dtime
+             write(iulog,*)'qflx_irrig                 = ',qflx_irrig(indexc)*dtime
+             write(iulog,*)'qflx_surf                  = ',qflx_surf(indexc)*dtime
+             write(iulog,*)'qflx_h2osfc_surf           = ',qflx_h2osfc_surf(indexc)*dtime
+             write(iulog,*)'qflx_qrgwl                 = ',qflx_qrgwl(indexc)*dtime
+             write(iulog,*)'qflx_drain                 = ',qflx_drain(indexc)*dtime
+             write(iulog,*)'qflx_drain_perched         = ',qflx_drain_perched(indexc)*dtime
+             write(iulog,*)'qflx_flood                 = ',qflx_floodc(indexc)*dtime
+             write(iulog,*)'qflx_snwcp_ice             = ',qflx_snwcp_ice(indexc)*dtime
+             write(iulog,*)'qflx_glcice_melt           = ',qflx_glcice_melt(indexc)*dtime
+             write(iulog,*)'qflx_glcice_frz            = ',qflx_glcice_frz(indexc) *dtime
+             write(iulog,*)'qflx_lateral               = ',qflx_lateral(indexc)*dtime
              write(iulog,*)'total_plant_stored_h2o_col = ',total_plant_stored_h2o_col(indexc)
              write(iulog,*)'clm model is stopping'
 
-             if (.not.pf_hmode .or. abs(errh2o(indexc)) > 1.e-1_r8) &
+             !if (.not.pf_hmode .or. abs(errh2o(indexc)) > 1.e-4_r8) &
              call endrun(decomp_index=indexc, clmlevel=namec, msg=errmsg(__FILE__, __LINE__))
           end if
        end if
