@@ -3443,8 +3443,9 @@ dliq = dliq + soilliq_clm_loc(cellcount)*dz(c,j)-h2osoi_liq(c,j)
              isattmp = h2osoi_ice(c,j)/(watsat(c,j)*dz(c,j)*denice)
           endif
 
-print *,'pf-water-change: kg/m2 ', c,j, soilliq_clm_loc(cellcount)*dz(c,j)-h2osoi_liq(c,j), &
-soilliq_clm_loc(cellcount), porosity
+print *,'pf-water-change: kg/m3 ', c,j, soilliq_clm_loc(cellcount)-h2osoi_liq(c,j)/dz(c,j), &
+soilliq_clm_loc(cellcount), h2osoi_liq(c,j)/dz(c,j)
+
 
           if(HEAD_BASED) then
              psitmp = soilpsi_clm_loc(cellcount)                                ! -Pa
@@ -3768,11 +3769,11 @@ real(r8):: qflx_evap
 
       !'from PF: qevap_subsurf_clm_loc: positive - in, negative - out
       qflx_evap = qevap_subsurf_clm_loc(gcount+1)/MM2KG_M2         &
-                       *dz(c,1)/dtime                                   ! kgH2O/m3/time-step ==> mmH2O/sec
+                       /dtime                                   ! kgH2O/m2/time-step ==> mmH2O/sec
 
       !'from PF: qinfl_subsurf_clm_loc: positive - in, negative - out
       qflx_infl(c) = qinfl_subsurf_clm_loc(gcount+1)/MM2KG_M2         &
-                       *dz(c,1)/dtime                                   ! kgH2O/m3/time-step ==> mmH2O/sec
+                       /dtime                                   ! kgH2O/m3/time-step ==> mmH2O/sec
       qflx_surf(c) = qflx_infl_potential  - qflx_infl(c)
       qflx_surf(c) = max(0._r8, qflx_surf(c))
 
