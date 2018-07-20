@@ -19,6 +19,7 @@
 !! $LastChangedDate$
 !<
 module piolib_mod
+  use iso_c_binding, only: C_NULL_CHAR
   !--------------
   use pio_kinds
   !--------------
@@ -1453,6 +1454,9 @@ contains
 
   subroutine genindexedblock(lenblocks,basetype,elemtype,filetype,displace)
     use pio_types, only : pio_double, pio_int, pio_real, pio_char
+#ifdef NO_MPI2
+    use pio_support, only : mpi_type_create_indexed_block
+#endif
     integer(i4), intent(in) :: lenblocks     ! length of blocks
     integer(i4), intent(in) :: basetype      ! base mpi type
     integer(i4), intent(inout) :: elemtype   ! elementary mpi type
@@ -1740,6 +1744,7 @@ contains
 
     integer(i4) :: iotask
     integer(i4) :: rearrFlag
+    integer :: version,uerr
 
 #ifdef TIMING
     call t_startf("PIO:PIO_init")
@@ -1983,7 +1988,21 @@ contains
     iosystem%numost = PIO_NUM_OST
     if(debug) print *,__LINE__,'init: iam: ',comp_rank,'io processor: ',iosystem%ioproc, 'io rank ',&
          iosystem%io_rank, iosystem%iomaster, iosystem%comp_comm, iosystem%io_comm
-
+    
+    version=0
+    
+    if ( iosystem%comp_rank ==0 ) THEN
+       write (*,*) "CALLING CREATE OBJECT"
+       call createobject("SEMapping.nc."//C_NULL_CHAR, version, uerr)
+       call createobject("start.cam.r.0"//C_NULL_CHAR, version, uerr)
+       call createobject("start.cam.rh0"//C_NULL_CHAR, version, uerr)
+       call createobject("start.cam.rs."//C_NULL_CHAR, version, uerr)
+       call createobject("start.cice.r."//C_NULL_CHAR, version, uerr)
+       call createobject("start.clm2.r."//C_NULL_CHAR, version, uerr)
+       call createobject("start.clm2.rh"//C_NULL_CHAR, version, uerr)       
+       call createobject("start.cpl.r.0"//C_NULL_CHAR, version, uerr)
+    end if
+    
 #ifdef TIMING
     call t_stopf("PIO:PIO_init")
 #endif
@@ -2022,7 +2041,7 @@ contains
     integer(i4), pointer :: iotmp(:)
     character(len=5) :: cb_nodes
     integer :: itmp
-
+    
 #ifdef TIMING
     call t_startf("PIO:PIO_init")
 #endif
@@ -2225,6 +2244,7 @@ contains
     call t_stopf("PIO:PIO_init")
 #endif
 #endif
+
   end subroutine init_intercom
 
 !>
@@ -2578,6 +2598,7 @@ contains
     character(len=9) :: stripestr2
     character(len=:), allocatable  :: myfname
     integer :: namelen
+    integer :: version,uerr
 #ifdef _COMPRESSION
     integer :: restart
 
@@ -2614,7 +2635,7 @@ contains
 
        call mpi_bcast(myfname, namelen, mpi_character, 0, iosystem%comp_comm, ierr)
     end if
-
+    
     file%iosystem => iosystem
 
     !--------------------------------
@@ -2650,10 +2671,22 @@ contains
        call mpi_bcast(myfname, namelen, mpi_character, iosystem%compmaster, iosystem%intercomm, ierr)
        call mpi_bcast(iotype, 1, mpi_integer, iosystem%compmaster, iosystem%intercomm, ierr)
        call mpi_bcast(amode, 1, mpi_integer, iosystem%compmaster, iosystem%intercomm, ierr)
-
     end if
-    select case(iotype)
-    case(pio_iotype_pbinary, pio_iotype_direct_pbinary)
+    
+    if (INDEX(myfname, "inputdata") == 0) THEN
+       if (myfname == "SEMapping.nc") THEN
+          file%name="SEMapping.nc."
+       else if (INDEX(myfname, ".") /= 1) THEN
+          file%name=myfname(1:13)
+       else
+          file%name=myfname(3:15)
+       end if
+    else
+       file%name=myfname
+    end if
+    
+   select case(iotype)
+   case(pio_iotype_pbinary, pio_iotype_direct_pbinary)
        if(present(amode_in) .and. iosystem%io_rank==0) then
           print *, 'warning, the mode argument is currently ignored for binary file operations'
        end if
@@ -2748,6 +2781,7 @@ contains
     character(len=9) :: rd_buffer
     character(len=:), allocatable :: myfname
     integer :: namelen
+    integer :: version,uerr
 #ifdef TIMING
     call t_startf("PIO:PIO_openfile")
 #endif
@@ -2801,7 +2835,6 @@ contains
        call mpi_bcast(amode, 1, MPI_INTEGER, 0, iosystem%comp_comm, ierr)
        call mpi_bcast(file%iotype, 1, MPI_INTEGER, 0, iosystem%comp_comm, ierr)
 
-
        call mpi_bcast(myfname, namelen, mpi_character, 0, iosystem%comp_comm, ierr)
     end if
 
@@ -2817,6 +2850,18 @@ contains
        call mpi_bcast(amode, 1, mpi_integer, iosystem%compmaster, iosystem%intercomm, ierr)
     end if
 
+    if (INDEX(myfname, "inputdata") == 0) THEN
+       if (myfname == "SEMapping.nc") THEN
+          file%name="SEMapping.nc."
+       else if (INDEX(myfname, ".") /= 1) THEN
+          file%name=myfname(1:13)
+       else
+          file%name=myfname(3:15)
+       end if
+    else
+       file%name=myfname
+    end if
+    
     select case(iotype)
     case(pio_iotype_pbinary, pio_iotype_direct_pbinary)
        if(amode /=0) then

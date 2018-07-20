@@ -30,8 +30,8 @@ module pio_types
 #ifdef SEQUENCE
 	sequence
 #endif
-        integer(i4) :: start
-        integer(i4) :: length
+        integer(i4) :: start=0
+        integer(i4) :: length=0
     end type
 
 !>
@@ -181,6 +181,7 @@ module pio_types
        integer(i4), pointer :: data_int(:) => null()
        real(r8), pointer :: data_double(:) => null()
        type(io_data_list), pointer :: next => null()
+       logical(log_kind) :: UseUnity=.FALSE.
     end type io_data_list
 
 
@@ -197,6 +198,7 @@ module pio_types
        integer(kind=PIO_OFFSET) :: offset             ! offset into file
        integer(i4)              :: iotype             ! Type of IO to perform see parameter statement below
        logical                  :: file_is_open = .false.
+       character(len=100)       :: name='NULL'
     end type File_desc_t
 
 
@@ -283,7 +285,7 @@ module pio_types
                                  ! netcdf file
 	integer(i4)     :: type
         integer(i4)     :: ndims ! number of dimensions as defined on the netcdf file.
-	character(len=50) :: name ! vdc needed variable
+	character(len=50) :: name='null' ! vdc needed variable
     end type
 
 !>

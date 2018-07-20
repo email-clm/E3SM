@@ -7,9 +7,9 @@
 !<
 module piodarray
   use pio_types, only : file_desc_t, io_desc_t, var_desc_t, pio_noerr, iosystem_desc_t, &
-	pio_iotype_pbinary, pio_iotype_binary, pio_iotype_direct_pbinary, &
-	pio_iotype_netcdf, pio_iotype_pnetcdf, pio_iotype_netcdf4p, pio_iotype_netcdf4c, &
-        PIO_MAX_VAR_DIMS, pio_iotype_vdc2
+       pio_iotype_pbinary, pio_iotype_binary, pio_iotype_direct_pbinary, &
+       pio_iotype_netcdf, pio_iotype_pnetcdf, pio_iotype_netcdf4p, pio_iotype_netcdf4c, &
+       PIO_MAX_VAR_DIMS, pio_iotype_vdc2
   use pio_kinds
   use pio_support
   use pionfwrite_mod, only : write_nf
@@ -18,15 +18,13 @@ module piodarray
   use iompi_mod
   use alloc_mod
   use rearrange
+  use iso_c_binding, only: C_NULL_CHAR, c_ptr, C_F_POINTER!, c_sizeof
 #ifndef NO_C_SIZEOF
   use iso_c_binding, only : c_sizeof  ! _EXTERNAL
 #else
 #define c_sizeof(x)  size(transfer (x, xxx_sizeof_data))
 #endif
-
-
-
-
+  
 #ifdef _COMPRESSION
   use piovdc
 #endif
@@ -52,37 +50,37 @@ module piodarray
 #endif
 
 
-!>
-!! @defgroup PIO_write_darray PIO_write_darray
-!! @brief The overloaded PIO_write_darray writes a distributed array to disk.
-!<
+  !>
+  !! @defgroup PIO_write_darray PIO_write_darray
+  !! @brief The overloaded PIO_write_darray writes a distributed array to disk.
+  !<
   interface PIO_write_darray
-! TYPE real,int,double
-! DIMS 1,2,3,4,5,6,7
+     ! TYPE real,int,double
+     ! DIMS 1,2,3,4,5,6,7
      module procedure write_darray_{DIMS}d_{TYPE}
-  end interface
+  end interface PIO_write_darray
 
 
-!>
-!! @defgroup PIO_read_darray PIO_read_darray
-!! @brief The overloaded PIO_read_darray function reads a distributed array from disk.
-!<
+  !>
+  !! @defgroup PIO_read_darray PIO_read_darray
+  !! @brief The overloaded PIO_read_darray function reads a distributed array from disk.
+  !<
   interface PIO_read_darray
-! TYPE real,int,double
-! DIMS 1,2,3,4,5,6,7
+     ! TYPE real,int,double
+     ! DIMS 1,2,3,4,5,6,7
      module procedure read_darray_{DIMS}d_{TYPE}
-  end interface
+  end interface PIO_read_darray
   interface pio_set_buffer_size_limit
-    module procedure pio_set_buffer_size_limit_i4
-    module procedure pio_set_buffer_size_limit_i8
-  end interface
-!>
-!! @private
-!<
+     module procedure pio_set_buffer_size_limit_i4
+     module procedure pio_set_buffer_size_limit_i8
+  end interface pio_set_buffer_size_limit
+  !>
+  !! @private
+  !<
   interface add_data_to_buffer
-! TYPE real,int,double
+     ! TYPE real,int,double
      module procedure add_data_to_buffer_{TYPE}
-  end interface
+  end interface add_data_to_buffer
 
 #ifdef _COMPRESSION
   interface
@@ -110,7 +108,7 @@ module piodarray
   integer :: pio_buffer_size_limit= 100000000   ! 100MB default
 
 #ifdef MEMCHK
-integer :: msize, rss, mshare, mtext, mstack, lastrss=0
+  integer :: msize, rss, mshare, mtext, mstack, lastrss=0
 #endif
 
 contains
@@ -120,7 +118,7 @@ contains
 
     if(limit<0) then
        call piodie(__PIO_FILE__,__LINE__,&
-       ' bad value to pio_set_buffer_size_limit')
+            ' bad value to pio_set_buffer_size_limit')
     end if
     pio_buffer_size_limit=limit
 
@@ -137,19 +135,19 @@ contains
   end subroutine pio_set_buffer_size_limit_i8
 
 
-! TYPE real,int,double
-!>
-!! @public
-!! @ingroup PIO_write_darray
-!! @brief Writes a 1D array of type {TYPE}.
-!! @details
-!! @param File    \ref file_desc_t
-!! @param varDesc \ref var_desc_t
-!! @param ioDesc  \ref io_desc_t
-!! @param array  : The data to be written
-!! @param iostat : The status returned from this routine (see \ref PIO_seterrorhandling for details)
-!! @param fillval : An optional fill value to fill holes in the data written
-!<
+  ! TYPE real,int,double
+  !>
+  !! @public
+  !! @ingroup PIO_write_darray
+  !! @brief Writes a 1D array of type {TYPE}.
+  !! @details
+  !! @param File    \ref file_desc_t
+  !! @param varDesc \ref var_desc_t
+  !! @param ioDesc  \ref io_desc_t
+  !! @param array  : The data to be written
+  !! @param iostat : The status returned from this routine (see \ref PIO_seterrorhandling for details)
+  !! @param fillval : An optional fill value to fill holes in the data written
+  !<
   subroutine write_darray_1d_{TYPE} (File,varDesc,ioDesc, array, iostat, fillval)
     use pio_msg_mod, only : pio_msg_writedarray
     ! !DESCRIPTION:
@@ -234,20 +232,20 @@ contains
 
   end subroutine write_darray_1d_{TYPE}
 
-! TYPE real,int,double
-! DIMS 2,3,4,5,6,7
-!>
-!! @public
-!! @ingroup PIO_write_darray
-!! @brief Writes a {DIMS}D array of type {TYPE}.
-!! @details
-!! @param File @ref file_desc_t
-!! @param varDesc @ref var_desc_t
-!! @param ioDesc  @ref io_desc_t
-!! @param array  : The data to be written
-!! @param iostat : The status returned from this routine (see \ref PIO_seterrorhandling for details)
-!! @param fillval : An optional fill value to fill holes in the data written
-!<
+  ! TYPE real,int,double
+  ! DIMS 2,3,4,5,6,7
+  !>
+  !! @public
+  !! @ingroup PIO_write_darray
+  !! @brief Writes a {DIMS}D array of type {TYPE}.
+  !! @details
+  !! @param File @ref file_desc_t
+  !! @param varDesc @ref var_desc_t
+  !! @param ioDesc  @ref io_desc_t
+  !! @param array  : The data to be written
+  !! @param iostat : The status returned from this routine (see \ref PIO_seterrorhandling for details)
+  !! @param fillval : An optional fill value to fill holes in the data written
+  !<
   subroutine write_darray_{DIMS}d_{TYPE} (File,varDesc,ioDesc, array, iostat, fillval)
     ! !INPUT PARAMETERS:
 
@@ -268,7 +266,7 @@ contains
     integer(i4), intent(out) :: iostat
     {VTYPE} :: transvar(1), dumbvar(0)
 
-! This code is required due to a bug in gfortran 4.7.2
+    ! This code is required due to a bug in gfortran 4.7.2
 #if (__GFORTRAN__) &&  (__GNUC__ == 4) && (__GNUC_MINOR__ < 8)
     {VTYPE}, allocatable :: acopy(:)
     integer :: isize
@@ -284,7 +282,7 @@ contains
     deallocate(acopy)
     return
 #else
-! cannot call transfer function with a 0 sized array
+    ! cannot call transfer function with a 0 sized array
     if(size(array)==0) then
        call write_darray_1d_{TYPE} (File, varDesc, iodesc, dumbvar, iostat)
     else if(present(fillval)) then
@@ -295,18 +293,18 @@ contains
 #endif
   end subroutine write_darray_{DIMS}d_{TYPE}
 
-! TYPE real,int,double
-!>
-!! @public
-!! @ingroup PIO_read_darray
-!! @brief
-!! @details
-!! @param File @ref file_desc_t
-!! @param varDesc @ref var_desc_t
-!! @param ioDesc @ref io_desc_t
-!! @param array  : The read data
-!! @param iostat : The status returned from this routine (see \ref PIO_seterrorhandling for details)
-!<
+  ! TYPE real,int,double
+  !>
+  !! @public
+  !! @ingroup PIO_read_darray
+  !! @brief
+  !! @details
+  !! @param File @ref file_desc_t
+  !! @param varDesc @ref var_desc_t
+  !! @param ioDesc @ref io_desc_t
+  !! @param array  : The read data
+  !! @param iostat : The status returned from this routine (see \ref PIO_seterrorhandling for details)
+  !<
   subroutine read_darray_1d_{TYPE} (File,varDesc, ioDesc, array, iostat)
     use pio_msg_mod, only : pio_msg_readdarray
     ! !DESCRIPTION:
@@ -371,19 +369,19 @@ contains
 
   end subroutine read_darray_1d_{TYPE}
 
-! TYPE real,int,double
-! DIMS 2,3,4,5,6,7
-!>
-!! @public
-!! @ingroup PIO_read_darray
-!! @brief Reads a {DIMS}D array of type {TYPE}.
-!! @details
-!! @param File @ref file_desc_t
-!! @param varDesc @ref var_desc_t
-!! @param ioDesc @ref io_desc_t
-!! @param array  : The read data
-!! @param iostat : The status returned from this routine (see \ref PIO_seterrorhandling for details)
-!<
+  ! TYPE real,int,double
+  ! DIMS 2,3,4,5,6,7
+  !>
+  !! @public
+  !! @ingroup PIO_read_darray
+  !! @brief Reads a {DIMS}D array of type {TYPE}.
+  !! @details
+  !! @param File @ref file_desc_t
+  !! @param varDesc @ref var_desc_t
+  !! @param ioDesc @ref io_desc_t
+  !! @param array  : The read data
+  !! @param iostat : The status returned from this routine (see \ref PIO_seterrorhandling for details)
+  !<
   subroutine read_darray_{DIMS}d_{TYPE} (File,varDesc,ioDesc, array, iostat)
     ! !INPUT PARAMETERS:
 
@@ -409,18 +407,18 @@ contains
 
   end subroutine read_darray_{DIMS}d_{TYPE}
 
-! TYPE real,int,double
-!>
-!! @private
-!! @brief Write a 1D array of type {TYPE} defined by varDesc using the decomposition described in iodesc to the netcdf or pnetcdf file File.
-!! @details
-!! @param File @ref file_desc_t
-!! @param varDesc @ref var_desc_t
-!! @param ioDesc @ref io_desc_t
-!! @param array  : The data to be written
-!! @param iostat : The status returned from this routine (see \ref PIO_seterrorhandling for details)
-!! @param fillval : An optional fill value to fill holes in the data written
-!<
+  ! TYPE real,int,double
+  !>
+  !! @private
+  !! @brief Write a 1D array of type {TYPE} defined by varDesc using the decomposition described in iodesc to the netcdf or pnetcdf file File.
+  !! @details
+  !! @param File @ref file_desc_t
+  !! @param varDesc @ref var_desc_t
+  !! @param ioDesc @ref io_desc_t
+  !! @param array  : The data to be written
+  !! @param iostat : The status returned from this routine (see \ref PIO_seterrorhandling for details)
+  !! @param fillval : An optional fill value to fill holes in the data written
+  !<
   subroutine write_darray_nf_{TYPE} (File,varDesc,ioDesc,array, iostat, fillval)
 
     ! !DESCRIPTION:
@@ -459,16 +457,15 @@ contains
 
     character(len=*), parameter :: subName=modName//'::write_darray_nf_{TYPE}'
     {VTYPE}, dimension(:), pointer ::  &
-         IOBUF => null()                ! local IO buffer
+         IOBUF                ! local IO buffer
 
     logical (log_kind) :: IOproc     ! true if IO processor
     integer (i4) ::  len,           &! length of IO decomp segmap
          iotype,        &! type of IO to perform
          ndims           ! number of variable dimensions
 
-    logical(log_kind) :: UseRearranger
+    logical(log_kind) :: UseRearranger, UseUnity=.FALSE.
 
-    logical(log_kind) :: is_iobuf_owned
 
 #if DEBUG_REARR
     {VTYPE}, dimension(:), pointer ::  array2
@@ -476,19 +473,22 @@ contains
 #endif
 
     {VTYPE} :: rsum
-    integer(i4) :: ierr
 
+    integer(i4) :: ierr
+    integer :: flags=0, pub=0, fd, lk_size, ver=1, comp=0, temp
+    character(len=100) :: fragname
+    type(c_ptr) :: data
+    INTEGER    tstat(MPI_STATUS_SIZE)
 #ifdef TIMING
     call t_startf("PIO:pio_write_darray")
 #endif
     ! -----------------------------------------------------
     ! pull information from file_desc_t data structure
     ! -----------------------------------------------------
+    UseUnity=.FALSE.
     IOproc     = File%iosystem%IOproc
     iotype     = File%iotype
     UseRearranger  = File%iosystem%UseRearranger
-
-    is_iobuf_owned = .false.
 
     ! ---------------------------------------------------------
     ! pull information out of the decomposition data structure
@@ -500,20 +500,34 @@ contains
     !
     ierr = pio_inq_varndims(file,vardesc,fndims)
 
-
     if(Debug) print *,__PIO_FILE__,__LINE__,' NAME : IAM: ', &
-    File%iosystem%comp_rank,' UseRearranger: ',UseRearranger,iodesc%glen, iodesc%iomap%start, len
+         File%iosystem%comp_rank,' UseRearranger: ',UseRearranger,iodesc%glen, iodesc%iomap%start, len
 #ifdef TIMING
     call t_startf("PIO:pio_rearrange_write")
     call t_startf("PIO:pre_pio_write_nf")
 #endif
+
+   
     if(UseRearranger) then
+
+       ! if(File%iosystem%comp_rank > 0) THEN
+       !    call mpi_recv(temp, 1, mpi_integer, File%iosystem%comp_rank-1, 1, File%iosystem%comp_comm, tstat,ierr)
+       ! end if
+       
        if (IOproc) then
           if(Debug) print *, subName,': IAM: ',File%iosystem%comp_rank, &
                'Before call to allocate(IOBUF): ',len, iodesc%write%n_elemtype
 
-          call alloc_check(IOBUF,len,' TYPE :IOBUF')
-          is_iobuf_owned = .true.
+          if (iodesc%IOmap%length > 0 .AND. vardesc%name /= 'null') THEN
+             ! WRITE(*,*) "piodarray_write: ", trim(vardesc%name), " [", iodesc%IOmap%start,":",iodesc%IOmap%length,"]", " ", trim(File%name), " ",
+             ! WRITE(*,*) "piodarray_write: ", trim(File%name), " ", File%fh
+             call createlocal(trim(File%name)//C_NULL_CHAR, trim(vardesc%name)//C_NULL_CHAR, iodesc%IOmap%start, iodesc%IOmap%length, flags, pub, fragname)
+             call attach(trim(File%name)//C_NULL_CHAR, fragname//C_NULL_CHAR, ver, comp, data, fd, lk_size)
+             call c_f_pointer(data, iobuf, [iodesc%IOmap%length])
+             useunity=.true.
+          else
+             call alloc_check(IOBUF,len,' TYPE :IOBUF')
+          end if
 
           if (present(fillval)) then
              IOBUF=fillval
@@ -530,17 +544,24 @@ contains
 
        else
           call alloc_check(IOBUF,0)
-          is_iobuf_owned = .true.
           IOBUF= -1.0_r8
        endif
 
+
+       ! if(File%iosystem%comp_rank < (File%iosystem%num_tasks-1)) THEN
+       !    call mpi_send(temp, 1, mpi_integer, File%iosystem%comp_rank+1, 1, File%iosystem%comp_comm, ierr)
+       ! END if
+
+       ! call MPI_BARRIER(File%iosystem%comp_comm, ierr)
+          
+
+          
        !------------------------------------
        ! Rearrange data from comp->io decomp
        !------------------------------------
        ! "array" is comp data
-
-       call rearrange_comp2io(File%iosystem,iodesc, array, IOBUF)
-
+       call rearrange_comp2io(File%iosystem,iodesc, array, iobuf)
+       
 #if DEBUG_REARR
        call alloc_check(array2,size(array),'array2')
 
@@ -552,7 +573,7 @@ contains
 
           end if
        end do
-
+       
        print *, subName,': passed write ping-pong test'
 
        call dealloc_check(array2)
@@ -564,11 +585,10 @@ contains
        !--------------------------------------------
     else
        if(file%iotype==pio_iotype_pnetcdf) then
-          allocate(IOBUF(size(array)))
-          IOBUF=array
-          is_iobuf_owned = .true.
+          allocate(iobuf(size(array)))
+          iobuf=array
        else
-          IOBUF=>array
+          iobuf=>array
        end if
     endif   ! if(UseRearranger)
 #ifdef TIMING
@@ -615,7 +635,7 @@ contains
 
 
           if(Debug) print *, __PIO_FILE__,__LINE__,'start:',start, &
-           ' count:',count,' ndims:',ndims, minval(IOBUF),maxval(IOBUF)
+               ' count:',count,' ndims:',ndims, minval(iobuf),maxval(iobuf)
           ! this is a timedependent single value
        else if(vardesc%rec>=0) then
           call alloc_check(start,1)
@@ -643,32 +663,51 @@ contains
        call alloc_check(count, 0)
     endif
 
-#ifdef TIMING
-    call t_stopf("PIO:pre_pio_write_nf")
-    call t_startf("PIO:pio_write_nf")
-#endif
-    ierr = write_nf(File,IOBUF,varDesc,iodesc,start,count, request)
-#ifdef TIMING
-    call t_stopf("PIO:pio_write_nf")
-#endif
+    ! if(File%iosystem%comp_rank > 0) THEN
+    !    call mpi_recv(temp, 1, mpi_integer, File%iosystem%comp_rank-1, 1, File%iosystem%comp_comm, tstat,ierr)
+    ! end if
+    if (UseUnity) then
+       call publish(trim(File%name)//C_NULL_CHAR, trim(fragname)//C_NULL_CHAR, data, lk_size, ver)
+       call detach(iobuf, lk_size)
+       call unityclose(fd);
+    end if
+    ! if(File%iosystem%comp_rank < (File%iosystem%num_tasks-1)) THEN
+    !    call mpi_send(temp, 1, mpi_integer, File%iosystem%comp_rank+1, 1, File%iosystem%comp_comm, ierr)
+    ! END if
+
+    
+! #ifdef TIMING
+!     call t_stopf("PIO:pre_pio_write_nf")
+!     call t_startf("PIO:pio_write_nf")
+! #endif
+!     !ierr = write_nf(File,IOBUF,varDesc,iodesc,start,count, request)
+! #ifdef TIMING
+!     call t_stopf("PIO:pio_write_nf")
+! #endif
+
+ 
     call dealloc_check(start)
     call dealloc_check(count)
-
+    
     if(IOPROC) then
 #ifdef TIMING
        call t_startf("PIO:post_pio_write_nf")
 #endif
+
        if(file%iotype==pio_iotype_pnetcdf) then
-          call add_data_to_buffer(File, IOBUF, request)
-          is_iobuf_owned = .false.
+          call add_data_to_buffer(File, IOBUF, request, useunity)
+       else if(Userearranger) then
+          if(useunity) then
+             call detach(iobuf, lk_size)
+          else
+             deallocate(iobuf)
+          end if
        end if
+
 #ifdef TIMING
        call t_stopf("PIO:post_pio_write_nf")
 #endif
     end if
-    if(associated(IOBUF) .and. is_iobuf_owned) then
-       deallocate(IOBUF)
-    endif ! if(IOPROC)
 
     !   call MPI_Barrier(File%iosystem%comp_comm,ierr)
 
@@ -684,18 +723,18 @@ contains
 #endif
   end subroutine write_darray_nf_{TYPE}
 
-! TYPE real,int,double
-!>
-!! @private
-!! @brief Write a 1D array of type {TYPE}.
-!! @details
-!! @param File @ref file_desc_t
-!! @param varDesc @ref var_desc_t
-!! @param ioDesc @ref io_desc_t
-!! @param array  : The data to be written
-!! @param iostat : The status returned from this routine (see \ref PIO_seterrorhandling for details)
-!! @param fillval : An optional fill value to fill holes in the data written
-!<
+  ! TYPE real,int,double
+  !>
+  !! @private
+  !! @brief Write a 1D array of type {TYPE}.
+  !! @details
+  !! @param File @ref file_desc_t
+  !! @param varDesc @ref var_desc_t
+  !! @param ioDesc @ref io_desc_t
+  !! @param array  : The data to be written
+  !! @param iostat : The status returned from this routine (see \ref PIO_seterrorhandling for details)
+  !! @param fillval : An optional fill value to fill holes in the data written
+  !<
   subroutine write_darray_bin_{TYPE}(File,varDesc,ioDesc,array, iostat, fillval)
 
     ! !DESCRIPTION:
@@ -733,7 +772,7 @@ contains
     character(len=*), parameter :: subName=modName//'::write_darray_bin_{TYPE}'
 
     {VTYPE}, dimension(:), pointer ::  &
-         IOBUF => null()                ! local IO buffer
+         IOBUF                ! local IO buffer
 
 
 #if DEBUG_REARR
@@ -839,14 +878,14 @@ contains
 
     if(IOProc) then
 #ifdef TIMING
-    call t_startf("PIO:pio_write_bin")
+       call t_startf("PIO:pio_write_bin")
 #endif
        !----------------------------------------------
        !	 write the global 2-d slice from IO processors
        !----------------------------------------------
        ierr = write_mpiio(File,IOBUF,varDesc,iodesc)
 #ifdef TIMING
-    call t_stopf("PIO:pio_write_bin")
+       call t_stopf("PIO:pio_write_bin")
 #endif
     endif
 
@@ -869,18 +908,18 @@ contains
   end subroutine write_darray_bin_{TYPE}
 
 
-! TYPE real,int,double
-!>
-!! @private
-!! @brief Read a 1D array of type {TYPE} defined by varDesc using the decomposition
-!! described in ioDesc to the netcdf or pnetcdf file File.
-!! @details
-!! @param File @ref file_desc_t
-!! @param varDesc @ref var_desc_t
-!! @param ioDesc @ref io_desc_t
-!! @param array  : The read data
-!! @param iostat : The status returned from this routine (see \ref PIO_seterrorhandling for details)
-!<
+  ! TYPE real,int,double
+  !>
+  !! @private
+  !! @brief Read a 1D array of type {TYPE} defined by varDesc using the decomposition
+  !! described in ioDesc to the netcdf or pnetcdf file File.
+  !! @details
+  !! @param File @ref file_desc_t
+  !! @param varDesc @ref var_desc_t
+  !! @param ioDesc @ref io_desc_t
+  !! @param array  : The read data
+  !! @param iostat : The status returned from this routine (see \ref PIO_seterrorhandling for details)
+  !<
   subroutine read_darray_nf_{TYPE} (File,varDesc,ioDesc,array, iostat)
 
     !
@@ -925,9 +964,14 @@ contains
 
 
     logical(log_kind), parameter :: Debug = .FALSE.
-    logical(log_kind) :: UseRearranger
+    logical(log_kind) :: UseRearranger, UseUnity=.FALSE.
     integer :: fndims
     integer(i4) :: ierr
+    integer :: flags=0, pub=0, fd, lk_size, ver=1, comp=1, temp
+    character(len=100) :: fragname
+    type(c_ptr) :: data
+    INTEGER    tstat(MPI_STATUS_SIZE)
+
 #if DEBUG_REARR
     {VTYPE}, dimension(:), pointer :: iobuf2
     integer i
@@ -939,6 +983,7 @@ contains
     ! -----------------------------------------------------
     ! pull information from file_desc_t data structure
     ! -----------------------------------------------------
+    UseUnity=.FALSE.
     IOproc    = File%iosystem%IOproc
     iotype    = File%iotype
     UseRearranger = File%iosystem%UseRearranger
@@ -953,9 +998,12 @@ contains
 
     ierr = pio_inq_varndims(File,vardesc,fndims)
 
-
+       ! if(File%iosystem%comp_rank > 0) THEN
+       !    call mpi_recv(temp, 1, mpi_integer, File%iosystem%comp_rank-1, 1, File%iosystem%comp_comm, tstat,ierr)
+       ! end if
+       
     if (IOproc) then
-! This is for pio2 compatablity
+       ! This is for pio2 compatablity
        if(fndims > size(iodesc%start) .and. vardesc%rec<0) then
           vardesc%rec =  1_PIO_OFFSET
        endif
@@ -968,8 +1016,16 @@ contains
                .and. file%iosystem%io_rank==0) then
              call alloc_check(IOBUF,iodesc%maxiobuflen,' TYPE :IOBUF')
           else
-             call alloc_check(IOBUF,len,' TYPE :IOBUF')
-          end if
+             if (iodesc%IOmap%length > 0 .AND. vardesc%name /= 'null' .AND. INDEX(File%name, "inputdata") == 0) THEN
+                ! WRITE(*,*) "piodarray_read: ", trim(vardesc%name), " [", iodesc%IOmap%start,":",iodesc%IOmap%length,"]", " ", trim(File%name)
+                call createlocal(trim(File%name)//C_NULL_CHAR, trim(vardesc%name)//C_NULL_CHAR, iodesc%IOmap%start, iodesc%IOmap%length, flags, pub, fragname)
+                call attach(trim(File%name)//C_NULL_CHAR, fragname//C_NULL_CHAR, ver, comp, data, fd, lk_size)
+                call c_f_pointer(data, iobuf, [iodesc%IOmap%length])
+                useunity=.true.
+             else
+                call alloc_check(IOBUF,len,' TYPE :IOBUF')
+             end if
+           end if
        else
           iobuf=>array
        end if
@@ -1003,15 +1059,26 @@ contains
           call alloc_check(IOBUF,0,'IOBUF')
        end if
     endif
-!    print *,__PIO_FILE__,__LINE__,ndims, fndims, start(1:fndims),count(1:fndims),vardesc%rec
+
+    ! if(File%iosystem%comp_rank < (File%iosystem%num_tasks-1)) THEN
+    !    call mpi_send(temp, 1, mpi_integer, File%iosystem%comp_rank+1, 1, File%iosystem%comp_comm, ierr)
+    ! END if
+
+    ! call MPI_BARRIER(File%iosystem%comp_comm, ierr)
+
+    !    print *,__PIO_FILE__,__LINE__,ndims, fndims, start(1:fndims),count(1:fndims),vardesc%rec
+
+    if ( vardesc%name == 'null' .OR. INDEX(File%name, "inputdata") /= 0) then
 
 #ifdef TIMING
-    call t_startf("PIO:pio_read_nf")
+       call t_startf("PIO:pio_read_nf")
 #endif
-    ierr = read_nf(File,IOBUF,varDesc,iodesc,start(1:ndims),count(1:ndims))
+       
+       ierr = read_nf(File,IOBUF,varDesc,iodesc,start(1:ndims),count(1:ndims))
 #ifdef TIMING
-    call t_stopf("PIO:pio_read_nf")
+       call t_stopf("PIO:pio_read_nf")
 #endif
+    end if
 
     if(DebugIO) print *, subName,': {comp,io}_rank: ',File%iosystem%comp_rank,File%iosystem%io_rank,  &
 	 'offset: ',iodesc%iomap%start,'len: ',len !,' IOBUF: ',IOBUF
@@ -1049,7 +1116,15 @@ contains
        ! --------------------------
        ! deallocate IO buffer
        ! --------------------------
-       call dealloc_check(IOBUF)
+
+       if(useunity) then
+          call detach(iobuf, lk_size)
+          call unityclose(fd)
+          !call publish(trim(File%name)//C_NULL_CHAR, trim(fragname)//C_NULL_CHAR, data, lk_size, ver)
+          ierr = PIO_NOERR
+       else
+          call dealloc_check(IOBUF)
+       end if
 
     endif
 #ifdef TIMING
@@ -1068,18 +1143,18 @@ contains
 
   end subroutine read_darray_nf_{TYPE}
 
-! TYPE real,int,double
-!>
-!! @private
-!! @brief  Read an array of type {TYPE} defined by varDesc using the decomposition
-!!  described in ioDesc to the netcdf or pnetcdf file File.
-!! @details
-!! @param File @ref file_desc_t
-!! @param varDesc @ref var_desc_t
-!! @param ioDesc @ref io_desc_t
-!! @param array  : The read data
-!! @param iostat : The status returned from this routine (see \ref PIO_seterrorhandling for details)
-!<
+  ! TYPE real,int,double
+  !>
+  !! @private
+  !! @brief  Read an array of type {TYPE} defined by varDesc using the decomposition
+  !!  described in ioDesc to the netcdf or pnetcdf file File.
+  !! @details
+  !! @param File @ref file_desc_t
+  !! @param varDesc @ref var_desc_t
+  !! @param ioDesc @ref io_desc_t
+  !! @param array  : The read data
+  !! @param iostat : The status returned from this routine (see \ref PIO_seterrorhandling for details)
+  !<
   subroutine read_darray_bin_{TYPE} (File,varDesc,ioDesc,array, iostat)
     !
     ! !DESCRIPTION:
@@ -1172,11 +1247,11 @@ contains
        end if
 
 #ifdef TIMING
-    call t_startf("PIO:pio_read_bin")
+       call t_startf("PIO:pio_read_bin")
 #endif
        ierr = read_mpiio(File,IOBUF,varDesc,iodesc)
 #ifdef TIMING
-    call t_stopf("PIO:pio_read_bin")
+       call t_stopf("PIO:pio_read_bin")
 #endif
 
        if(DebugIO) print *, subName,': TYPE: {comp,io}_rank: ',File%iosystem%comp_rank,File%iosystem%io_rank,  &
@@ -1238,13 +1313,14 @@ contains
   end subroutine read_darray_bin_{TYPE}
 
   ! TYPE real,int,double
-  subroutine add_data_to_buffer_{TYPE} (File, IOBUF, request)
+  subroutine add_data_to_buffer_{TYPE} (File, IOBUF, request,  useunity)
     use pio_types, only : io_data_list
     type(file_desc_t) :: File
     {VTYPE}, pointer :: IOBUF(:)
     integer, intent(in) :: request
     integer :: cnt, mpierr, maxbuffsize, this_buffsize
     type(io_data_list), pointer :: ptr
+    logical, optional, intent(in) :: useunity
 
     if(.not. associated(File%data_list_top)) then
        allocate(file%data_list_top)
@@ -1261,6 +1337,11 @@ contains
     end if
     ptr%request = request
     ptr%data_{TYPE} => IOBUF
+    if (present(useunity)) then
+       ptr%useunity=useunity
+    else
+       ptr%useunity=.FALSE.
+    end if
     this_buffsize = size(iobuf)*c_sizeof(iobuf(1))
     file%buffsize=file%buffsize+this_buffsize
     total_buffsize = total_buffsize+this_buffsize
@@ -1276,7 +1357,7 @@ contains
        call darray_write_complete(File)
     endif
 
-!    if(debug)
+    !    if(debug)
 
   end subroutine add_data_to_buffer_{TYPE}
 
@@ -1296,7 +1377,6 @@ contains
     integer, pointer :: array_of_requests(:), status(:)
 
     if(associated(file%data_list_top)) then
-
        cnt=1
        ptr=>file%data_list_top
        do while(associated(ptr))
@@ -1319,16 +1399,26 @@ contains
 
        ptr=>file%data_list_top
        do while(associated(ptr))
-          if(associated(ptr%data_double)) then
-             deallocate(ptr%data_double)
-          else if(associated(ptr%data_real)) then
-             deallocate(ptr%data_real)
-          else if(associated(ptr%data_int)) then
-             deallocate(ptr%data_int)
+          if (ptr%useunity) then
+             if(associated(ptr%data_double)) then
+                call detach(ptr%data_double, size(ptr%data_double)*c_sizeof(ptr%data_double(1)))
+             else if(associated(ptr%data_real)) then
+                call detach(ptr%data_real, size(ptr%data_real)*c_sizeof(ptr%data_real(1)))
+             else if(associated(ptr%data_int)) then
+                call detach(ptr%data_int, size(ptr%data_int)*c_sizeof(ptr%data_int(1)))
+             end if
+          else
+             if(associated(ptr%data_double)) then
+                deallocate(ptr%data_double)
+             else if(associated(ptr%data_real)) then
+                deallocate(ptr%data_real)
+             else if(associated(ptr%data_int)) then
+                deallocate(ptr%data_int)
+             end if
           end if
           prevptr=>ptr
           ptr => ptr%next
-          deallocate(prevptr)
+          ! deallocate(prevptr)
        end do
        nullify(file%data_list_top)
 
@@ -1350,7 +1440,7 @@ contains
 
 #ifdef _COMPRESSION
 
- subroutine write_vdc2_real(File, Vardesc, iodesc, array, iostat)
+  subroutine write_vdc2_real(File, Vardesc, iodesc, array, iostat)
     use pio_support, only : piodie
     use, intrinsic :: iso_c_binding
     use C_interface_mod, only : F_C_STRING_DUP
@@ -1378,7 +1468,7 @@ contains
     !EOP
     !BOC
 
-    !!!!!!!!!!! locals !!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!! locals !!!!!!!!!!!!!!!!!!!!!
     real(r4), dimension(:), pointer ::  &
          IOBUF                        ! local IO buffer
 
@@ -1462,7 +1552,7 @@ contains
 #endif
   end subroutine write_vdc2_real
 
-subroutine read_vdc2_real(File, Vardesc, iodesc, array, iostat)
+  subroutine read_vdc2_real(File, Vardesc, iodesc, array, iostat)
     use pio_support, only : piodie
     use, intrinsic :: iso_c_binding
     use C_interface_mod, only : F_C_STRING_DUP
@@ -1490,7 +1580,7 @@ subroutine read_vdc2_real(File, Vardesc, iodesc, array, iostat)
     !EOP
     !BOC
 
-    !!!!!!!!!!! locals !!!!!!!!!!!!!!!!!!!!!
+!!!!!!!!!!! locals !!!!!!!!!!!!!!!!!!!!!
     real(r4), dimension(:), pointer ::  &
          IOBUF                        ! local IO buffer
 
@@ -1526,7 +1616,7 @@ subroutine read_vdc2_real(File, Vardesc, iodesc, array, iostat)
           IOBUF= -1.0_r8
           cptr = c_loc(iobuf(1))
   	  call ReadVDC2Var(cptr, start, count,  File%iosystem%IO_comm, vardesc%rec, -1, -1, File%iosystem%num_iotasks, &
-          F_C_String_dup(varDesc%name))
+               F_C_String_dup(varDesc%name))
        else
           call alloc_check(IOBUF,0)
           IOBUF= -1.0_r8
@@ -1553,4 +1643,3 @@ subroutine read_vdc2_real(File, Vardesc, iodesc, array, iostat)
 
 
 end module piodarray
-

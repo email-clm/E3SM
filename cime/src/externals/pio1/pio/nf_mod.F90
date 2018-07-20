@@ -756,6 +756,8 @@ contains
     if(ierr==PIO_NOERR) then
        ierr = pio_inq_varndims(File, vardesc%varid, vardesc%ndims) ! needed for nfwrite
     end if
+
+    vardesc%name=name
   end function inq_varid_vardesc
 
 !>
@@ -1695,6 +1697,7 @@ contains
     integer :: iotype, mpierr, nlen
     integer :: msg = PIO_MSG_DEF_VAR
 
+    vardesc%name=name
 
     iotype = File%iotype
 
