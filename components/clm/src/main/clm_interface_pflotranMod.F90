@@ -1,6 +1,6 @@
 module clm_interface_pflotranMod
 
-#define CLM_PFLOTRAN
+!#define CLM_PFLOTRAN
 ! the above #directive IS for explicit coupling CLM and PFLOTRAN (i.e. this interface)
 
 !#define COLUMN_MODE

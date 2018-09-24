@@ -466,9 +466,15 @@ for mct, etc.
 </compiler>
 
 <compiler COMPILER="gnu" MACH="mymac" >
-  <NETCDF_PATH> $(NETCDF_PATH)</NETCDF_PATH>
-  <ADD_LDFLAGS compile_threaded="true"> -L $(GCC_ROOT)/lib/gcc/x86_64-apple-darwin15.4.0/5.3.0 -fopenmp </ADD_LDFLAGS>
-  <ADD_LDFLAGS>-framework Accelerate</ADD_LDFLAGS>
+  <ADD_CFLAGS compile_threaded="true"> -fopenmp </ADD_CFLAGS>
+  <ADD_FFLAGS compile_threaded="true"> -fopenmp </ADD_FFLAGS>
+  <ADD_LDFLAGS compile_threaded="true"> -fopenmp </ADD_LDFLAGS>
+  <ADD_LDFLAGS>-framework Accelerate \
+       -L$(NETCDF_PATH)/lib -lnetcdff -lnetcdf \
+       -L$(HDF5_PATH)/lib -lhdf5_hl -lhdf5 -lhdf5hl_fortran -lhdf5_fortran \
+       -L$(PNETCDF_PATH)/lib -lpnetcdf \
+       -L$(GCC_ROOT)/lib -lgomp
+  </ADD_LDFLAGS>
   <ADD_SLIBS>$(shell $(NETCDF_PATH)/bin/nf-config --flibs) -framework Accelerate</ADD_SLIBS>
   <SFC>$(GCC_ROOT)/bin/gfortran</SFC>
   <SCC>$(GCC_ROOT)/bin/gcc</SCC>
@@ -878,20 +884,6 @@ for mct, etc.
   <ADD_FFLAGS DEBUG="TRUE"> -g -traceback  -O0 -fpe0 -check  all -check noarg_temp_created -ftrapuv </ADD_FFLAGS>
   <ADD_SLIBS>$(shell /usr/workspace/wsa/climdat/spack/opt/spack/linux-rhel7-x86_64/intel-17.0.0/netcdf-fortran-4.4.4-4naprkre2m7kriadyxwboauil7nc3jtc/bin/nf-config --flibs)</ADD_SLIBS>
   <ADD_LDFLAGS> -llapack -lblas</ADD_LDFLAGS>
-</compiler>
-
-<compiler MACH="oic5" COMPILER="gnu">
-  <NETCDF_PATH>/projects/cesm/devtools/netcdf-4.1.3-gcc4.8.1-mpich3.0.4/</NETCDF_PATH>
-  <ADD_SLIBS>-L/user/lib64 -llapack -lblas -lnetcdff </ADD_SLIBS>
-  <SFC>/projects/cesm/devtools/gcc-4.8.1/bin/gfortran</SFC>
-  <SCC>/projects/cesm/devtools/gcc-4.8.1/bin/gcc</SCC>
-  <SCXX>/projects/cesm/devtools/gcc-4.8.1/bin/g++</SCXX>
-  <MPICC>/projects/cesm/devtools/mpich-3.0.4-gcc4.8.1/bin/mpicc</MPICC>
-  <MPIFC>/projects/cesm/devtools/mpich-3.0.4-gcc4.8.1/bin/mpif90</MPIFC>
-</compiler>
-
-<compiler MACH="oic5" COMPILER="pgi">
-  <NETCDF_PATH>/home/zdr/opt/netcdf-4.1.3_pgf95</NETCDF_PATH>
 </compiler>
 
 <compiler COMPILER="gnu" MACH="cades">
