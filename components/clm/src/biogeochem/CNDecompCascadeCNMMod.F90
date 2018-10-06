@@ -10,7 +10,7 @@ module CNDecompCascadeCNMMod
   use shr_const_mod          , only : SHR_CONST_TKFRZ
   use shr_log_mod            , only : errMsg => shr_log_errMsg
   use clm_varpar             , only : nlevsoi, nlevgrnd, nlevdecomp, ndecomp_cascade_transitions, ndecomp_pools
-  use clm_varpar             , only : i_met_lit, i_cel_lit, i_lig_lit, i_cwd
+  use clm_varpar             , only : i_met_lit, i_cel_lit, i_lig_lit, i_cwd, i_bacteria, i_fungi, i_dom, cn_bacteria, cn_fungi, cn_dom, CUEmax
   use clm_varctl             , only : iulog, spinup_state, anoxia, use_lch4, use_vertsoilc, use_fates
   use clm_varcon             , only : zsoi
   use decompMod              , only : bounds_type
@@ -58,7 +58,7 @@ module CNDecompCascadeCNMMod
      real(r8):: rf_s3s4_cn      !respiration fraction SOM 3 -> SOM 4
 
      real(r8) :: cwd_fcel_cn    !cellulose fraction for CWD
-     real(r8) :: cwd_flig_cn    !
+     real(r8) :: cwd_flig_cn    ! fraction of cwd to for CWD
 
      real(r8) :: k_l1_cn        !decomposition rate for litter 1
      real(r8) :: k_l2_cn        !decomposition rate for litter 2

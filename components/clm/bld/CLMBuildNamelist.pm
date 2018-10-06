@@ -1066,9 +1066,7 @@ sub setup_cmdl_check_bgc {
     if ( defined($nl->get_value($var)) && ($nl->get_value($var) ne $val)) {
       fatal_error("$var has a value (".$nl->get_value($var).") that is NOT consistent with the commandline setting of -soil_decomp century\n");
     }
-  } 
-
-elsif ($val eq "ctcm") {
+  } elsif ($val eq "ctcm") {
     $var = "use_ctcm_decomp";
     $val = ".true.";
 
@@ -1522,7 +1520,44 @@ sub setup_cmdl_soil_decomp {
             fatal_error("$var has a value ($val) that is NOT valid. Valid values are: @valid_values\n");
           }
 
-        } else {
+          $var = "use_ctcm_decomp";
+          $val = ".false.";
+
+          my $group = $definition->get_group_name($var);
+          $nl_flags->{$var} = $val;
+          $nl->set_variable_value($group, $var, $val);
+
+          if (  ! $definition->is_valid_value( $var, $val ) ) {
+            my @valid_values   = $definition->get_valid_values( $var );
+            fatal_error("$var has a value ($val) that is NOT valid. Valid values are: @valid_values\n");
+          }
+        } elsif ($val eq "ctcm") {
+          $var = "use_century_decomp";
+          $val = ".false.";
+
+          my $group = $definition->get_group_name($var);
+          $nl_flags->{$var} = $val;
+          $nl->set_variable_value($group, $var, $val);
+
+          if (  ! $definition->is_valid_value( $var, $val ) ) {
+            my @valid_values   = $definition->get_valid_values( $var );
+            fatal_error("$var has a value ($val) that is NOT valid. Valid values are: @valid_values\n");
+          }
+
+          $var = "use_ctcm_decomp";
+          $val = ".true.";
+
+          my $group = $definition->get_group_name($var);
+          $nl_flags->{$var} = $val;
+          $nl->set_variable_value($group, $var, $val);
+
+          if (  ! $definition->is_valid_value( $var, $val ) ) {
+            my @valid_values   = $definition->get_valid_values( $var );
+            fatal_error("$var has a value ($val) that is NOT valid. Valid values are: @valid_values\n");
+          }
+        } 
+	
+	  else {
           fatal_error("-soil_decomp has a value ($val) that is not valid. Valid values are: [rd, eca] \n");
         }
       }
@@ -2608,6 +2643,7 @@ sub setup_logic_demand {
     $settings{'use_lch4'}            = $nl_flags->{'use_lch4'};
     $settings{'use_nitrif_denitrif'} = $nl_flags->{'use_nitrif_denitrif'};
     $settings{'use_vertsoilc'}       = $nl_flags->{'use_vertsoilc'};
+    $settings{'use_ctcm_decomp'}  = $nl_flags->{'use_ctcm_decomp'};
     $settings{'use_century_decomp'}  = $nl_flags->{'use_century_decomp'};
     $settings{'use_crop'}            = $nl_flags->{'use_crop'};
   }
@@ -2726,6 +2762,7 @@ sub setup_logic_initial_conditions {
                     'use_cn'=>$nl_flags->{'use_cn'}, 'use_cndv'=>$nl_flags->{'use_cndv'},
                     'use_nitrif_denitrif'=>$nl_flags->{'use_nitrif_denitrif'},
                     'use_vertsoilc'=>$nl_flags->{'use_vertsoilc'},
+                    'use_ctcm_decomp'=>$nl_flags->{'use_ctcm_decomp'},
                     'use_century_decomp'=>$nl_flags->{'use_century_decomp'},
                     'sim_year'=>$nl_flags->{'sim_year'}, 'maxpft'=>$nl_flags->{'maxpft'},
                     'more_vertlayers'=>$nl_flags->{'more_vert'},
@@ -2752,6 +2789,7 @@ sub setup_logic_initial_conditions {
                     'use_cn'=>$nl_flags->{'use_cn'}, 'use_cndv'=>$nl_flags->{'use_cndv'},
                     'use_nitrif_denitrif'=>$nl_flags->{'use_nitrif_denitrif'},
                     'use_vertsoilc'=>$nl_flags->{'use_vertsoilc'},
+                    'use_ctcm_decomp'=>$nl_flags->{'use_ctcm_decomp'},
                     'use_century_decomp'=>$nl_flags->{'use_century_decomp'},
                     'sim_year'=>$nl_flags->{'sim_year'}, 'maxpft'=>$nl_flags->{'maxpft'},
                     'more_vertlayers'=>$nl_flags->{'more_vert'},
@@ -2778,6 +2816,7 @@ sub setup_logic_initial_conditions {
                     'use_cn'=>$nl_flags->{'use_cn'}, 'use_cndv'=>$nl_flags->{'use_cndv'},
                     'use_nitrif_denitrif'=>$nl_flags->{'use_nitrif_denitrif'},
                     'use_vertsoilc'=>$nl_flags->{'use_vertsoilc'},
+                    'use_ctcm_decomp'=>$nl_flags->{'use_ctcm_decomp'},
                     'use_century_decomp'=>$nl_flags->{'use_century_decomp'},
                     'sim_year'=>$nl_flags->{'sim_year'}, 'maxpft'=>$nl_flags->{'maxpft'},
                     'more_vertlayers'=>$nl_flags->{'more_vert'},
