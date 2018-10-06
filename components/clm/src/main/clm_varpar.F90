@@ -65,7 +65,14 @@ module clm_varpar
   integer :: i_cel_lit 
   integer :: i_lig_lit 
   integer :: i_cwd 
-
+  INTEGER :: i_bacteria
+  INTEGER :: i_fungi
+  INTEGER :: i_dom
+  INTEGER :: cn_bacteria
+  INTEGER :: cn_fungi
+  INTEGER :: cn_dom
+  INTEGER :: CUEmax
+  
   integer :: ndecomp_pools
   integer :: ndecomp_cascade_transitions
 
@@ -195,6 +202,22 @@ contains
           i_lig_lit = 3
           i_cwd = 4
        else
+       
+       if (use_ctcm) then
+	  ndecomp_pools = 11
+          ndecomp_cascade_transitions = 41
+          i_met_lit = 1
+          i_cel_lit = 2
+          i_lig_lit = 3
+          i_cwd = 4
+	  i_bacteria = 9
+          i_fungi = 10
+          i_dom = 11
+	  cn_bacteria = 5
+	  cn_fungi = 15
+	  cn_dom = 10
+  
+	else
           ndecomp_pools = 8
           ndecomp_cascade_transitions = 9
           i_met_lit = 1

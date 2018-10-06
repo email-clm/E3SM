@@ -204,6 +204,9 @@ OPTIONS
      -methane                 Toggle for prognostic methane model.
                               This flag is only allowed for bgc=cn mode (default is off)
 			      This turns on namelist variable: use_lch4
+     -mghg                 Toggle for prognostic GHG model.
+                              This flag is only allowed for bgc=cn mode (default is off)
+			      This turns on namelist variable: use_mghg
      -namelist "namelist"     Specify namelist settings directly on the commandline by supplying
                               a string containing FORTRAN namelist syntax, e.g.,
                                  -namelist "&clm_inparm dt=1800 /"
@@ -228,8 +231,9 @@ OPTIONS
                               future scenarios.
                               "-rcp list" to list valid rcp settings.
      -s                       Turns on silent mode - only fatal messages issued.
-     -soil_decomp             CLM4.5 Only. Soil decomposition model [ctc | century]
+     -soil_decomp             CLM4.5 Only. Soil decomposition model [ctc | ctcm | century]
                                 ctc      = Convergent Trophic Cascade
+			       ctcm   = Convergent Trophic Cascade - DOM, BF
                                 century  = CENTURY Soil Organic Matter Model
      -test                    Enable checking that input datasets exist on local filesystem.
      -use_case "case"         Specify a use case which will provide default values.
@@ -794,7 +798,7 @@ sub setup_cmdl_fates_mode {
 
       # The following variables may be set by the user and are compatible with use_ed
       # no need to set defaults, covered in a different routine
-      my @list  = (  "use_fates_spitfire", "use_vertsoilc", "use_century_decomp",
+      my @list  = (  "use_fates_spitfire", "use_vertsoilc", "use_ctcm_decomp", "use_century_decomp",
                      "use_fates_planthydro", "use_fates_ed_st3", "use_fates_ed_prescribed_phys", 
 		     "use_fates_inventory_init", "fates_inventory_ctrl_filename","use_fates_logging" );
       foreach my $var ( @list ) {
@@ -1041,6 +1045,13 @@ sub setup_cmdl_check_bgc {
       fatal_error("$var has a value (".$nl->get_value($var).") that is NOT consistent with the commandline setting of -soil_decomp ctc\n");
     }
 
+    $var = "use_ctcm_decomp";
+    $val = ".false.";
+
+    if ( defined($nl->get_value($var)) && ($nl->get_value($var) ne $val)) {
+      fatal_error("$var has a value (".$nl->get_value($var).") that is NOT consistent with the commandline setting of -soil_decomp ctc\n");
+    }
+
   } elsif ($val eq "century") {
     $var = "use_century_decomp";
     $val = ".true.";
@@ -1048,8 +1059,31 @@ sub setup_cmdl_check_bgc {
     if ( defined($nl->get_value($var)) && ($nl->get_value($var) ne $val)) {
       fatal_error("$var has a value (".$nl->get_value($var).") that is NOT consistent with the commandline setting of -soil_decomp century\n");
     }
-  }
+    
+    $var = "use_ctcm_decomp";
+    $val = ".false.";
 
+    if ( defined($nl->get_value($var)) && ($nl->get_value($var) ne $val)) {
+      fatal_error("$var has a value (".$nl->get_value($var).") that is NOT consistent with the commandline setting of -soil_decomp century\n");
+    }
+  } 
+
+elsif ($val eq "ctcm") {
+    $var = "use_ctcm_decomp";
+    $val = ".true.";
+
+    if ( defined($nl->get_value($var)) && ($nl->get_value($var) ne $val)) {
+      fatal_error("$var has a value (".$nl->get_value($var).") that is NOT consistent with the commandline setting of -soil_decomp ctcm\n");
+    }
+    
+    $var = "use_century_decomp";
+    $val = ".false.";
+
+    if ( defined($nl->get_value($var)) && ($nl->get_value($var) ne $val)) {
+      fatal_error("$var has a value (".$nl->get_value($var).") that is NOT consistent with the commandline setting of -soil_decomp ctcm\n");
+    }
+  }
+  
 } # end check_bgc
 
 #-------------------------------------------------------------------------------
@@ -1463,6 +1497,18 @@ sub setup_cmdl_soil_decomp {
             fatal_error("$var has a value ($val) that is NOT valid. Valid values are: @valid_values\n");
           }
 
+          $var = "use_ctcm_decomp";
+          $val = ".false.";
+
+          my $group = $definition->get_group_name($var);
+          $nl_flags->{$var} = $val;
+          $nl->set_variable_value($group, $var, $val);
+
+          if (  ! $definition->is_valid_value( $var, $val ) ) {
+            my @valid_values   = $definition->get_valid_values( $var );
+            fatal_error("$var has a value ($val) that is NOT valid. Valid values are: @valid_values\n");
+          }
+	  
         } elsif ($val eq "century") {
           $var = "use_century_decomp";
           $val = ".true.";
