@@ -11,7 +11,7 @@ module clm_initializeMod
   use abortutils       , only : endrun
   use clm_varctl       , only : nsrest, nsrStartup, nsrContinue, nsrBranch
   use clm_varctl       , only : create_glacier_mec_landunit, iulog
-  use clm_varctl       , only : use_lch4, use_cn, use_cndv, use_voc, use_c13, use_c14, use_ed, use_betr  
+  use clm_varctl       , only : use_lch4, use_cn, use_cndv, use_voc, use_c13, use_c14, use_fates, use_betr  
   use clm_varsur       , only : wt_lunit, urban_valid, wt_nat_patch, wt_cft, wt_glc_mec, topo_glc_mec
   use clm_varsur       , only : fert_cft
   use perf_mod         , only : t_startf, t_stopf
@@ -19,7 +19,10 @@ module clm_initializeMod
   use readParamsMod    , only : readSharedParameters, readPrivateParameters
   use ncdio_pio        , only : file_desc_t
   use FatesInterfaceMod, only : set_fates_global_elements
+#ifdef CLM_SBTR
   use BeTRSimulationALM, only : create_betr_simulation_alm
+#endif
+
   ! 
   !-----------------------------------------
   ! Definition of component types
@@ -54,7 +57,7 @@ contains
     use clm_varctl                , only: fsurdat, fatmlndfrc, flndtopo, fglcmask, noland, version  
     use pftvarcon                 , only: pftconrd
     use soilorder_varcon          , only: soilorder_conrd
-    use decompInitMod             , only: decompInit_lnd, decompInit_clumps, decompInit_glcp
+    use decompInitMod             , only: decompInit_lnd, decompInit_clumps, decompInit_gtlcp
     use domainMod                 , only: domain_check, ldomain, domain_init
     use surfrdMod                 , only: surfrd_get_globmask, surfrd_get_grid, surfrd_get_topo, surfrd_get_data
     use controlMod                , only: control_init, control_print, NLFilename
@@ -244,7 +247,7 @@ contains
     ! The PFT file, specifically, will dictate how many pfts are used
     ! in fates, and this will influence the amount of memory we
     ! request from the model, which is relevant in set_fates_global_elements()
-    if (use_ed) then
+    if (use_fates) then
        call FatesReadPFTs()
     end if
 
@@ -264,18 +267,18 @@ contains
     ! (Note: fates_maxELementsPerSite is the critical variable used by CLM
     ! to allocate space)
     ! ------------------------------------------------------------------------
-    call set_fates_global_elements(use_ed)
+    call set_fates_global_elements(use_fates)
     
 
     ! ------------------------------------------------------------------------
-    ! Determine decomposition of subgrid scale landunits, columns, patches
+    ! Determine decomposition of subgrid scale landunits, topounits, columns, patches
     ! ------------------------------------------------------------------------
 
     if (create_glacier_mec_landunit) then
-       call decompInit_clumps(ns, ni, nj, ldomain%glcmask)
+       call decompInit_clumps(ldomain%glcmask)
        call decompInit_ghosts(ldomain%glcmask)
     else
-       call decompInit_clumps(ns, ni, nj)
+       call decompInit_clumps()
        call decompInit_ghosts()
     endif
 
@@ -288,16 +291,25 @@ contains
     ! Note that the assumption is made that none of the subgrid initialization
     ! can depend on other elements of the subgrid in the calls below
 
+    ! Initialize the gridcell data types
     call grc_pp%Init (bounds_proc%begg_all, bounds_proc%endg_all)
-    ! --ALM-v1: add initialization for topographic unit data types. 
-    ! For preliminary testing, use the same dimensions as gridcell (one topounit per gridcell)
-    call top_pp%Init (bounds_proc%begg, bounds_proc%endg) ! topology and physical properties
-    call top_es%Init (bounds_proc%begg, bounds_proc%endg) ! energy state
-    call top_ws%Init (bounds_proc%begg, bounds_proc%endg) ! water state
-    ! --end ALM-v1 block
+    
+    ! Initialize the topographic unit data types
+    call top_pp%Init (bounds_proc%begt_all, bounds_proc%endt_all) ! topology and physical properties
+    call top_es%Init (bounds_proc%begt_all, bounds_proc%endt_all) ! energy state
+    call top_ws%Init (bounds_proc%begt_all, bounds_proc%endt_all) ! water state
+    
+    ! Initialize the landunit data types
     call lun_pp%Init (bounds_proc%begl_all, bounds_proc%endl_all)
+    
+    ! Initialize the column data types
     call col_pp%Init (bounds_proc%begc_all, bounds_proc%endc_all)
+    
+    ! Initialize the vegetation (PFT) data types
     call veg_pp%Init (bounds_proc%begp_all, bounds_proc%endp_all)
+    
+    ! Initialize the cohort data types (nothing here yet)
+    ! ...to be added later...
 
     ! Determine the number of active external models.
     call EMI_Determine_Active_EMs()
@@ -310,9 +322,9 @@ contains
     ! Set global seg maps for gridcells, landlunits, columns and patches
 
     if (create_glacier_mec_landunit) then
-       call decompInit_glcp(ns, ni, nj, ldomain%glcmask)
+       call decompInit_gtlcp(ns, ni, nj, ldomain%glcmask)
     else
-       call decompInit_glcp(ns, ni, nj)
+       call decompInit_gtlcp(ns, ni, nj)
     endif
 
     ! Set filters
@@ -386,7 +398,7 @@ contains
     use clm_varcon            , only : h2osno_max, bdsno, spval
     use landunit_varcon       , only : istice, istice_mec, istsoil
     use clm_varctl            , only : finidat, finidat_interp_source, finidat_interp_dest, fsurdat
-    use clm_varctl            , only : use_century_decomp, single_column, scmlat, scmlon, use_cn, use_ed
+    use clm_varctl            , only : use_century_decomp, single_column, scmlat, scmlon, use_cn, use_fates
     use clm_varorb            , only : eccen, mvelpp, lambm0, obliqr
     use clm_time_manager      , only : get_step_size, get_curr_calday
     use clm_time_manager      , only : get_curr_date, get_nstep, advance_timestep 
@@ -424,9 +436,8 @@ contains
     use SoilWaterRetentionCurveFactoryMod   , only : create_soil_water_retention_curve
     use clm_varctl                          , only : use_clm_interface, use_pflotran
     use clm_interface_pflotranMod           , only : clm_pf_interface_init !, clm_pf_set_restart_stamp
-    use tracer_varcon         , only : is_active_betr_bgc    
+    use clm_varctl            , only : is_active_betr_bgc
     use clm_time_manager      , only : is_restart
-    use ALMbetrNLMod          , only : betr_namelist_buffer
     !
     ! !ARGUMENTS    
     implicit none
@@ -556,6 +567,7 @@ contains
 
     call clm_inst_biogeophys(bounds_proc)
 
+#ifdef CLM_SBTR
     if(use_betr)then
       !allocate memory for betr simulator
       allocate(ep_betr, source=create_betr_simulation_alm())
@@ -566,6 +578,7 @@ contains
     else
       allocate(ep_betr, source=create_betr_simulation_alm())
     endif
+#endif
     
     call SnowOptics_init( ) ! SNICAR optical parameters:
 
@@ -575,13 +588,13 @@ contains
     ! Read in private parameters files, this should be preferred for mulitphysics
     ! implementation, jinyun Tang, Feb. 11, 2015
     ! ------------------------------------------------------------------------
-    if(use_cn .or. use_ed) then
+    if(use_cn .or. use_fates) then
        call init_decomp_cascade_constants()
     endif
     !read bgc implementation specific parameters when needed
     call readPrivateParameters()
 
-    if (use_cn .or. use_ed) then
+    if (use_cn .or. use_fates) then
        if (.not. is_active_betr_bgc)then
           if (use_century_decomp) then
            ! Note that init_decompcascade_bgc needs cnstate_vars to be initialized
@@ -618,6 +631,8 @@ contains
     if (crop_prog) then
        call crop_vars%initAccBuffer(bounds_proc)
     end if
+
+    call cnstate_vars%initAccBuffer(bounds_proc)
 
     call print_accum_fields()
 
@@ -691,7 +706,9 @@ contains
                soilstate_vars, solarabs_vars, surfalb_vars, temperature_vars,                 &
                waterflux_vars, waterstate_vars,                                               &
                phosphorusstate_vars,phosphorusflux_vars,                                      &
+#ifdef CLM_SBTR
                ep_betr,                                                                       &
+#endif
                alm_fates, glc2lnd_vars, crop_vars)
        end if
 
@@ -707,7 +724,9 @@ contains
             soilstate_vars, solarabs_vars, surfalb_vars, temperature_vars,                 &
             waterflux_vars, waterstate_vars,                                               &
             phosphorusstate_vars,phosphorusflux_vars,                                      &
+#ifdef CLM_SBTR
             ep_betr,                                                                       &
+#endif
             alm_fates, glc2lnd_vars, crop_vars)
 
     end if
@@ -731,9 +750,11 @@ contains
                glc2lnd_vars%icemask_grc(bounds_clump%begg:bounds_clump%endg))
        end do
        !$OMP END PARALLEL DO
+#ifdef CLM_SBTR
        if(use_betr)then
          call ep_betr%set_active(bounds_proc, col_pp)
        endif
+#endif
        ! Create new template file using cold start
        call restFile_write(bounds_proc, finidat_interp_dest,                               &
             atm2lnd_vars, aerosol_vars, canopystate_vars, cnstate_vars,                    &
@@ -743,7 +764,9 @@ contains
             soilstate_vars, solarabs_vars, surfalb_vars, temperature_vars,                 &
             waterflux_vars, waterstate_vars,                                               &
             phosphorusstate_vars,phosphorusflux_vars,                                      &
+#ifdef CLM_SBTR
             ep_betr,                                                                       &
+#endif
             alm_fates, crop_vars)
 
        ! Interpolate finidat onto new template file
@@ -759,7 +782,9 @@ contains
             soilstate_vars, solarabs_vars, surfalb_vars, temperature_vars,                 &
             waterflux_vars, waterstate_vars,                                               &
             phosphorusstate_vars,phosphorusflux_vars,                                      &
+#ifdef CLM_SBTR
             ep_betr,                                                                       &
+#endif
             alm_fates, glc2lnd_vars, crop_vars)
 
        ! Reset finidat to now be finidat_interp_dest 
@@ -776,9 +801,12 @@ contains
     end do
     !$OMP END PARALLEL DO
 
+#ifdef CLM_SBTR
     if(use_betr)then
       call ep_betr%set_active(bounds_proc, col_pp)
     endif 
+#endif
+
     ! ------------------------------------------------------------------------
     ! Initialize nitrogen deposition
     ! ------------------------------------------------------------------------
@@ -831,6 +859,7 @@ contains
     if (crop_prog) then
        call crop_vars%initAccVars(bounds_proc)
     end if
+    call cnstate_vars%initAccVars(bounds_proc)
 
     !------------------------------------------------------------       
     ! Read monthly vegetation
@@ -891,7 +920,7 @@ contains
     ! Initialise the FATES model state structure cold-start
     ! --------------------------------------------------------------
    
-    if ( use_ed .and. .not.is_restart() .and. finidat == ' ') then
+    if ( use_fates .and. .not.is_restart() .and. finidat == ' ') then
        call alm_fates%init_coldstart(waterstate_vars,canopystate_vars, &
                                      soilstate_vars, frictionvel_vars)
     end if

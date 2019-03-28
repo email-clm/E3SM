@@ -6,7 +6,7 @@ module readParamsMod
   ! module used to read parameters for individual modules
   !
   use clm_varctl   , only: use_cn, use_century_decomp, use_nitrif_denitrif
-  use clm_varctl   , only: use_lch4, use_ed
+  use clm_varctl   , only: use_lch4, use_fates
   implicit none
   save
   private
@@ -94,8 +94,7 @@ contains
     use fileutils                , only : getfil
     use ncdio_pio                , only : ncd_pio_closefile, ncd_pio_openfile, &
                                           file_desc_t, ncd_inqdid, ncd_inqdlen
-    use tracer_varcon            , only : is_active_betr_bgc                                         
-    
+    use clm_varctl               , only : is_active_betr_bgc
     !
     ! !ARGUMENTS:
     implicit none
@@ -127,7 +126,7 @@ contains
     ! populate each module with private parameters
     !       
 
-    if ( (use_cn .or. use_ed) ) then
+    if ( (use_cn .or. use_fates) ) then
 
        call readCNAllocParams(ncid)
        if(.not. is_active_betr_bgc) then

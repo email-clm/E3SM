@@ -17,7 +17,7 @@ module CNNStateUpdate1BeTRMod
   use CNNitrogenFluxType     , only : nitrogenflux_type
   use CNNitrogenStateType    , only : nitrogenstate_type
   use VegetationType                , only : veg_pp
-  use tracer_varcon          , only : is_active_betr_bgc
+  use clm_varctl             , only : is_active_betr_bgc
   !! bgc interface & pflotran:
   use clm_varctl             , only : use_pflotran, pf_cmode
   !
@@ -75,13 +75,8 @@ contains
 
       ! column-level fluxes
 
-      ! seeding fluxes, from dynamic landcover
-      do fc = 1,num_soilc
-         c = filter_soilc(fc)
-         ns%seedn_col(c) = ns%seedn_col(c) - nf%dwt_seedn_to_leaf_col(c) * dt
-         ns%seedn_col(c) = ns%seedn_col(c) - nf%dwt_seedn_to_deadstem_col(c) * dt
-      end do
-
+      ! seeding fluxes from dynamic landcover are now not accounted for in
+      ! NStateUpdate1 (see CNNStateUpdate1Mod)
 
       ! patch loop
 

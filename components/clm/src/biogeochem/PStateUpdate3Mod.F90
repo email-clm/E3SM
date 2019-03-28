@@ -17,7 +17,7 @@ module PStateUpdate3Mod
   use PhosphorusStateType , only : phosphorusstate_type
   use PhosphorusFLuxType  , only : phosphorusflux_type
   use soilorder_varcon    , only : smax,ks_sorption
-  use tracer_varcon       , only : is_active_betr_bgc
+  use clm_varctl          , only : is_active_betr_bgc
   ! bgc interface & pflotran:
   use clm_varctl          , only : use_pflotran, pf_cmode
   use clm_varctl          , only : nu_com
@@ -180,6 +180,7 @@ contains
                             pf%secondp_to_labilep_vr_col(c,j)*dt + pf%supplement_to_sminp_vr_col(c,j)*dt - &
                             pf%sminp_to_plant_vr_col(c,j)*dt - pf%labilep_to_secondp_vr_col(c,j)*dt - &
                             pf%sminp_leached_vr_col(c,j)*dt ))
+
                  if (temp_solutionp(c,j) < 0.0_r8) then
                     pf%labilep_to_secondp_vr_col(c,j) = pf%labilep_to_secondp_vr_col(c,j)/ &
                             (pf%labilep_to_secondp_vr_col(c,j)+pf%sminp_leached_vr_col(c,j))* &
@@ -209,6 +210,7 @@ contains
            enddo
          end if
 
+         if (nu_com .eq. 'RD') then
           do j = 1, nlevdecomp
              do fc = 1,num_soilc
                 c = filter_soilc(fc)
@@ -219,6 +221,7 @@ contains
                 end do
              end do
           end do
+         end if
 
          do j = 1, nlevdecomp
             do fc = 1,num_soilc

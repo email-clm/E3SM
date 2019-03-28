@@ -41,7 +41,8 @@ contains
     ! !DESCRIPTION:
     ! On the radiation time step, calculate the radioactive decay of C14
     !
-    use tracer_varcon, only : is_active_betr_bgc      
+    use clm_varctl     , only : is_active_betr_bgc
+
     ! !ARGUMENTS:
     integer                , intent(in)    :: num_soilc       ! number of soil columns filter
     integer                , intent(in)    :: filter_soilc(:) ! filter for soil columns
@@ -116,7 +117,7 @@ contains
             do j = 1, nlevdecomp
                do fc = 1,num_soilc
                   c = filter_soilc(fc)
-                  if (spinup_term .eq. 1 .and. yr .ge. 40 .and. nu_com .eq. 'RD') then
+                  if (spinup_term > 1._r8 .and. yr .ge. 40) then
                       decomp_cpools_vr(c,j,l) = decomp_cpools_vr(c,j,l) * (1._r8 - decay_const * &
                           (spinup_term / cnstate_vars%scalaravg_col(c,j)) * dt)
                   else
