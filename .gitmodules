@@ -8,3 +8,6 @@
 [submodule "components/mpas-source"]
 	path = components/mpas-source
 	url = https://github.com/MPAS-Dev/MPAS-Model.git
+[submodule "microbe"]
+        path = components/clm/src/external_models/microbe
+	url = https://github.com/email-clm/clm-microbe.git
